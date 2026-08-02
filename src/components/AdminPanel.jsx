@@ -566,6 +566,9 @@ export default function AdminPanel({ seriesData, onSaveData, onClose }) {
                   <KeyRound className="w-3.5 h-3.5 text-purple-300 shrink-0" />
                   <input
                     type="text"
+                    autoComplete="off"
+                    autoCorrect="off"
+                    spellCheck="false"
                     placeholder="Pega aquí tu API Key (v3) de TMDB"
                     value={tmdbKeyInput}
                     onChange={(e) => setTmdbKeyInput(e.target.value)}

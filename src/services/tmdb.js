@@ -5,8 +5,13 @@ const TMDB_KEY_STORAGE = 'y_que_paso_tmdb_key';
 const TMDB_BASE = 'https://api.themoviedb.org/3';
 const IMG_BASE = 'https://image.tmdb.org/t/p';
 
+// Default TMDB key so image search works on any device without manual setup.
+// Visible in the public site's JS bundle by design (owner's choice) — override
+// per-device by pasting a different key in the Admin panel.
+const DEFAULT_TMDB_KEY = '359da37984af6e36228e89c7e692b877';
+
 export function getTmdbKey() {
-  return localStorage.getItem(TMDB_KEY_STORAGE) || '';
+  return localStorage.getItem(TMDB_KEY_STORAGE) || DEFAULT_TMDB_KEY;
 }
 
 export function setTmdbKey(key) {

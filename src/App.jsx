@@ -42,6 +42,15 @@ export default function App() {
     saveStoredSeriesDatabase(newData);
   };
 
+  const buildTimestamp = new Date(__BUILD_TIME__).toLocaleString('es-ES', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+  });
+
   return (
     <div className="min-h-screen bg-[var(--bg-app)] text-gray-100 flex flex-col font-opensans selection:bg-[var(--accent)] selection:text-white">
       {/* Header */}
@@ -93,10 +102,15 @@ export default function App() {
 
       {/* Footer */}
       <footer className="border-t border-[var(--border-soft)] py-6 bg-[var(--bg-card)] text-center text-xs text-[var(--text-muted)]">
-        <div className="max-w-7xl mx-auto px-4 flex items-center justify-center gap-2">
-          <LogoMark className="w-6 h-6" />
-          <span className="font-baloo font-bold text-gray-200">Y QUÉ PASÓ?</span>
-          <span>• Wiki Cinéfila & Admin Platform</span>
+        <div className="max-w-7xl mx-auto px-4 flex flex-col items-center justify-center gap-1">
+          <div className="flex items-center gap-2">
+            <LogoMark className="w-6 h-6" />
+            <span className="font-baloo font-bold text-gray-200">Y QUÉ PASÓ?</span>
+            <span>• Wiki Cinéfila & Admin Platform</span>
+          </div>
+          <span className="text-[10px] text-[var(--text-muted)]/70">
+            Versión: {buildTimestamp}
+          </span>
         </div>
       </footer>
     </div>
