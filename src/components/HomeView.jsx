@@ -27,7 +27,7 @@ export default function HomeView({ seriesList, searchQuery, setSearchQuery, onSe
       
       {/* Logo & Title */}
       <div className="mb-8 cursor-pointer" onClick={() => setSearchQuery('')}>
-        <LogoMark className="w-20 h-20 sm:w-24 sm:h-24 mx-auto mb-5 rounded-2xl" iconClassName="w-9 h-9 sm:w-11 sm:h-11" />
+        <LogoMark className="w-20 h-20 sm:w-24 sm:h-24 mx-auto mb-5" />
 
         <h1 className="font-baloo text-4xl sm:text-5xl md:text-6xl font-extrabold tracking-tight text-[var(--text-main)]">
           Y QUÉ PASÓ?

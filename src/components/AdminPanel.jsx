@@ -670,7 +670,7 @@ export default function AdminPanel({ seriesData, onSaveData, onClose }) {
                           <img src={char.avatar} alt={char.name} className="w-9 h-9 rounded-full object-cover border border-rose-300" />
                           <div>
                             <span className="text-sm font-bold text-white block">{char.name}</span>
-                            <span className="text-[11px] text-gray-400">Zona: {char.zona} • Edad: {char.edad} • Actor: {char.actor}</span>
+                            <span className="text-[11px] text-gray-400">Zona: {char.zona} • Edad Real: {char.edad} • Actor: {char.actor}</span>
                           </div>
                         </div>
                         <button
@@ -706,7 +706,7 @@ export default function AdminPanel({ seriesData, onSaveData, onClose }) {
                         </div>
 
                         <div>
-                          <label className="text-[10px] text-gray-400 block mb-1">Edad / Época</label>
+                          <label className="text-[10px] text-gray-400 block mb-1">Edad Real del Actor</label>
                           <input
                             type="text"
                             value={char.edad || ''}

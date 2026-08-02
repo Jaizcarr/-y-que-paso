@@ -1,12 +1,28 @@
 import React from 'react';
 import { Clapperboard } from 'lucide-react';
 
-// Minimal flat logo mark used in place of the old popcorn photo.
-export function LogoMark({ className = 'w-11 h-11', iconClassName = 'w-5 h-5' }) {
+// Stylized flat popcorn bucket mark — the app's logo.
+export function LogoMark({ className = 'w-11 h-11' }) {
   return (
-    <div className={`${className} rounded-xl bg-[var(--accent)] flex items-center justify-center shrink-0`}>
-      <Clapperboard className={`${iconClassName} text-[#1e1d1b]`} strokeWidth={2.25} />
-    </div>
+    <svg viewBox="0 0 48 48" className={`${className} shrink-0`} xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <clipPath id="bucketClip">
+          <polygon points="13,20 35,20 31,42 17,42" />
+        </clipPath>
+      </defs>
+      {/* popcorn kernels */}
+      <circle cx="17" cy="15" r="6" fill="var(--text-main)" stroke="var(--accent)" strokeWidth="1.5" />
+      <circle cx="24" cy="11" r="7" fill="var(--text-main)" stroke="var(--accent)" strokeWidth="1.5" />
+      <circle cx="31" cy="15" r="6" fill="var(--text-main)" stroke="var(--accent)" strokeWidth="1.5" />
+      {/* bucket body */}
+      <polygon points="13,20 35,20 31,42 17,42" fill="var(--accent)" />
+      <g clipPath="url(#bucketClip)">
+        <rect x="18.5" y="18" width="4" height="26" fill="var(--text-main)" />
+        <rect x="27.5" y="18" width="4" height="26" fill="var(--text-main)" />
+      </g>
+      {/* rim */}
+      <rect x="12" y="17.5" width="24" height="4" rx="2" fill="#c1613f" />
+    </svg>
   );
 }
 

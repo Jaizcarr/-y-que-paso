@@ -159,7 +159,7 @@ export default function SeriesView({ series, onBackHome, onSelectCharacter }) {
 
                 <div className="flex flex-col items-center border-x border-[var(--border-soft)] px-1">
                   <span className="text-[10px] text-gray-400 flex items-center gap-1 font-semibold uppercase">
-                    <Calendar className="w-3 h-3 text-[var(--accent)]" /> Edad
+                    <Calendar className="w-3 h-3 text-[var(--accent)]" /> Edad del Actor
                   </span>
                   <span className="text-xs text-gray-200 font-bold mt-1 line-clamp-1">
                     {character.edad || 'N/A'}

@@ -95,7 +95,7 @@ export default function App() {
       <footer className="border-t border-[var(--border-soft)] py-6 bg-[var(--bg-card)] text-center text-xs text-[var(--text-muted)]">
         <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-2">
-            <LogoMark className="w-6 h-6 rounded-md" iconClassName="w-3.5 h-3.5" />
+            <LogoMark className="w-6 h-6" />
             <span className="font-baloo font-bold text-gray-200">Y QUÉ PASÓ?</span>
             <span>• Wiki Cinéfila & Admin Platform</span>
           </div>
