@@ -1,0 +1,84 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --bg-app: #1e1d1b;
+    --bg-card: #26251f;
+    --bg-subtle: #2f2e28;
+    --accent: #d97757;
+    --accent-soft: rgba(217, 119, 87, 0.14);
+    --text-main: #f2efe9;
+    --text-muted: #a39b8e;
+    --border-soft: rgba(245, 242, 235, 0.08);
+  }
+
+  body {
+    background-color: var(--bg-app);
+    color: var(--text-main);
+    font-family: 'Inter', system-ui, sans-serif;
+    overflow-x: hidden;
+    min-height: 100vh;
+  }
+
+  h1, h2, h3, h4, .font-baloo {
+    font-family: 'Inter', system-ui, sans-serif;
+    letter-spacing: -0.01em;
+  }
+}
+
+/* Typography Utilities (kept for compatibility with existing markup) */
+.font-baloo {
+  font-family: 'Inter', system-ui, sans-serif;
+  font-weight: 700;
+}
+
+.font-opensans,
+.font-outfit,
+.font-cinzel {
+  font-family: 'Inter', system-ui, sans-serif;
+}
+
+/* Muted Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 7px;
+  height: 7px;
+}
+::-webkit-scrollbar-track {
+  background: var(--bg-app);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--bg-subtle);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--accent);
+}
+
+/* Flat minimal panel (glassmorphism removed) */
+.glass-panel {
+  background: var(--bg-card);
+  border: 1px solid var(--border-soft);
+}
+
+.glass-panel-hover {
+  transition: border-color 0.2s ease, background-color 0.2s ease;
+}
+.glass-panel-hover:hover {
+  background: var(--bg-subtle);
+  border-color: rgba(217, 119, 87, 0.35);
+}
+
+/* Top Accent Line */
+.cinema-curtain-top {
+  height: 2px;
+  background: var(--accent);
+  opacity: 0.6;
+}
+
+/* Google Maps Canvas Pan/Grab cursor */
+.canvas-grab {
+  cursor: grab;
+}
+.canvas-grabbing {
+  cursor: grabbing;
+}
