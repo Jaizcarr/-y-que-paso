@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Lock, Save, Plus, Trash2, Edit3, RefreshCw, Download, Upload, FileSpreadsheet, Check, AlertCircle, Film, Users, Search, Image, Loader2, KeyRound } from 'lucide-react';
+import { X, Lock, Save, Plus, Trash2, Edit3, RefreshCw, Download, Upload, FileSpreadsheet, Check, AlertCircle, Film, Users, Search, Image, Loader2, KeyRound, Copy } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { initialSeriesDatabase } from '../data/seriesData';
 import { PosterPlaceholder } from './Placeholders';
@@ -107,6 +107,16 @@ export default function AdminPanel({ seriesData, onSaveData, onClose }) {
     persistTmdbKey(trimmed);
     setTmdbKeyState(trimmed);
     setTmdbStatus(trimmed ? 'API Key de TMDB guardada.' : 'API Key eliminada.');
+  };
+
+  const handleCopyTmdbKey = async () => {
+    if (!tmdbKey) return;
+    try {
+      await navigator.clipboard.writeText(tmdbKey);
+      setTmdbStatus('API Key copiada al portapapeles.');
+    } catch (err) {
+      setTmdbStatus('No se pudo copiar automáticamente. Selecciona el texto del campo manualmente.');
+    }
   };
 
   const ensureTmdbId = async (series) => {
@@ -451,7 +461,7 @@ export default function AdminPanel({ seriesData, onSaveData, onClose }) {
                 <label className="text-xs text-gray-300 font-semibold block mb-1">Usuario</label>
                 <input
                   type="text"
-                  placeholder="admin"
+                  placeholder="Usuario"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
                   className="w-full bg-black/30 text-sm text-gray-100 px-4 py-2.5 rounded-xl border border-[var(--border-soft)] focus:outline-none focus:border-[var(--accent)]"
@@ -462,7 +472,7 @@ export default function AdminPanel({ seriesData, onSaveData, onClose }) {
                 <label className="text-xs text-gray-300 font-semibold block mb-1">Contraseña</label>
                 <input
                   type="password"
-                  placeholder="admin"
+                  placeholder="Contraseña"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   className="w-full bg-black/30 text-sm text-gray-100 px-4 py-2.5 rounded-xl border border-[var(--border-soft)] focus:outline-none focus:border-[var(--accent)]"
@@ -477,9 +487,9 @@ export default function AdminPanel({ seriesData, onSaveData, onClose }) {
 
               <button
                 type="submit"
-                className="w-full py-3 rounded-xl bg-[var(--accent)] text-[#1e1d1b] font-bold text-sm hover:brightness-110 transition-all font-baloo"
+                className="w-full py-3 rounded-xl bg-[var(--accent)] text-[#1e1d1b] font-bold text-sm shadow-lg shadow-[var(--accent)]/20 hover:brightness-110 hover:shadow-xl hover:shadow-[var(--accent)]/30 hover:-translate-y-0.5 active:translate-y-0 transition-all duration-200 font-baloo"
               >
-                Entrar como Admin (admin / admin)
+                Entrar al Panel
               </button>
             </form>
           </div>
@@ -568,6 +578,16 @@ export default function AdminPanel({ seriesData, onSaveData, onClose }) {
                 >
                   <Save className="w-3.5 h-3.5" /> Guardar Key
                 </button>
+
+                {tmdbKey && (
+                  <button
+                    onClick={handleCopyTmdbKey}
+                    title="Copia la key ya guardada en este navegador, sin escribir su valor en el código"
+                    className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-gray-200 border border-white/15 text-xs font-bold transition-all"
+                  >
+                    <Copy className="w-3.5 h-3.5" /> Copiar mi API Key
+                  </button>
+                )}
 
                 <button
                   onClick={handleAutoFillSeries}

@@ -34,7 +34,7 @@ export default function HomeView({ seriesList, searchQuery, setSearchQuery, onSe
         </h1>
 
         <p className="mt-2 text-sm sm:text-base text-[var(--text-muted)] font-opensans max-w-xl mx-auto leading-relaxed">
-          Wiki de cinefilia interactiva. Navega por mapas en 2D estilo Google Maps para conocer el destino canónico de tus personajes.
+          Wiki de cinefilia interactiva. Navega por mapas interactivos en 2D para conocer el destino canónico de tus personajes.
         </p>
       </div>
 

@@ -24,9 +24,6 @@ export default function Header({ currentView, selectedSeries, onNavigateHome, se
                 WIKI
               </span>
             </div>
-            <p className="text-[11px] text-[var(--text-muted)] font-opensans hidden sm:block">
-              Mapas históricos interactivos estilo Google Maps
-            </p>
           </div>
         </button>
 
@@ -61,7 +58,7 @@ export default function Header({ currentView, selectedSeries, onNavigateHome, se
           {/* Admin Button */}
           <button
             onClick={onOpenAdmin}
-            className="flex items-center gap-1.5 px-3.5 py-2 rounded-full bg-[var(--accent-soft)] hover:brightness-110 border border-[var(--accent)]/30 text-[var(--accent)] text-xs font-bold transition-all"
+            className="flex items-center gap-1.5 px-4 py-2 rounded-full bg-[var(--accent)] text-[#1e1d1b] text-xs font-bold shadow-md shadow-[var(--accent)]/20 hover:shadow-lg hover:shadow-[var(--accent)]/30 hover:-translate-y-0.5 active:translate-y-0 transition-all duration-200"
             title="Abrir Panel Admin y Carga Masiva Excel/CSV"
           >
             <Lock className="w-3.5 h-3.5" />
