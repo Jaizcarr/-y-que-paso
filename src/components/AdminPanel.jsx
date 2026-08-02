@@ -565,7 +565,7 @@ export default function AdminPanel({ seriesData, onSaveData, onClose }) {
                 <div className="flex items-center gap-1.5 bg-black/50 rounded-xl border border-white/15 px-3 py-2">
                   <KeyRound className="w-3.5 h-3.5 text-purple-300 shrink-0" />
                   <input
-                    type="password"
+                    type="text"
                     placeholder="Pega aquí tu API Key (v3) de TMDB"
                     value={tmdbKeyInput}
                     onChange={(e) => setTmdbKeyInput(e.target.value)}
