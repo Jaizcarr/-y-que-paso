@@ -32,10 +32,6 @@ export default function HomeView({ seriesList, searchQuery, setSearchQuery, onSe
         <h1 className="font-baloo text-4xl sm:text-5xl md:text-6xl font-extrabold tracking-tight text-[var(--text-main)]">
           Y QUÉ PASÓ?
         </h1>
-
-        <p className="mt-2 text-sm sm:text-base text-[var(--text-muted)] font-opensans max-w-xl mx-auto leading-relaxed">
-          Wiki de cinefilia interactiva. Navega por mapas interactivos en 2D para conocer el destino canónico de tus personajes.
-        </p>
       </div>
 
       {/* Clean & Minimalist Search Bar */}

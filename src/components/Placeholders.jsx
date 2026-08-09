@@ -1,27 +1,36 @@
 import React from 'react';
 import { Clapperboard } from 'lucide-react';
 
-// Stylized flat popcorn bucket mark — the app's logo.
+// Stylized cinema-chair mascot mark — popcorn-cloud head with 3D glasses,
+// sitting on a chair silhouette. Flat, two-tone (accent + cream), no
+// background shape, so it blends straight into whatever sits behind it.
 export function LogoMark({ className = 'w-11 h-11' }) {
   return (
-    <svg viewBox="0 0 48 48" className={`${className} shrink-0`} xmlns="http://www.w3.org/2000/svg">
-      <defs>
-        <clipPath id="bucketClip">
-          <polygon points="13,20 35,20 31,42 17,42" />
-        </clipPath>
-      </defs>
-      {/* popcorn kernels */}
-      <circle cx="17" cy="15" r="6" fill="var(--text-main)" stroke="var(--accent)" strokeWidth="1.5" />
-      <circle cx="24" cy="11" r="7" fill="var(--text-main)" stroke="var(--accent)" strokeWidth="1.5" />
-      <circle cx="31" cy="15" r="6" fill="var(--text-main)" stroke="var(--accent)" strokeWidth="1.5" />
-      {/* bucket body */}
-      <polygon points="13,20 35,20 31,42 17,42" fill="var(--accent)" />
-      <g clipPath="url(#bucketClip)">
-        <rect x="18.5" y="18" width="4" height="26" fill="var(--text-main)" />
-        <rect x="27.5" y="18" width="4" height="26" fill="var(--text-main)" />
-      </g>
-      {/* rim */}
-      <rect x="12" y="17.5" width="24" height="4" rx="2" fill="#c1613f" />
+    <svg viewBox="0 0 64 64" className={`${className} shrink-0`} xmlns="http://www.w3.org/2000/svg">
+      {/* popcorn-cloud head */}
+      <circle cx="22" cy="16" r="8" fill="var(--text-main)" stroke="var(--accent)" strokeWidth="2.5" />
+      <circle cx="32" cy="10" r="9" fill="var(--text-main)" stroke="var(--accent)" strokeWidth="2.5" />
+      <circle cx="42" cy="16" r="8" fill="var(--text-main)" stroke="var(--accent)" strokeWidth="2.5" />
+
+      {/* face band */}
+      <rect x="18" y="14" width="28" height="16" rx="5" fill="var(--text-main)" stroke="var(--accent)" strokeWidth="2.5" />
+
+      {/* 3D glasses */}
+      <rect x="21" y="19" width="9" height="7" rx="2" fill="var(--accent)" />
+      <rect x="34" y="19" width="9" height="7" rx="2" fill="#9c4c31" />
+      <line x1="30" y1="22.5" x2="34" y2="22.5" stroke="var(--accent)" strokeWidth="2" />
+
+      {/* chair body */}
+      <rect x="14" y="28" width="36" height="22" rx="6" fill="var(--text-main)" stroke="var(--accent)" strokeWidth="2.5" />
+
+      {/* armrests */}
+      <rect x="8" y="32" width="10" height="16" rx="5" fill="var(--text-main)" stroke="var(--accent)" strokeWidth="2.5" />
+      <rect x="46" y="32" width="10" height="16" rx="5" fill="var(--text-main)" stroke="var(--accent)" strokeWidth="2.5" />
+
+      {/* popcorn spilling on the seat */}
+      <circle cx="27" cy="37" r="3.5" fill="var(--text-main)" stroke="var(--accent)" strokeWidth="1.75" />
+      <circle cx="34" cy="36" r="4" fill="var(--text-main)" stroke="var(--accent)" strokeWidth="1.75" />
+      <circle cx="30.5" cy="41" r="3" fill="var(--text-main)" stroke="var(--accent)" strokeWidth="1.75" />
     </svg>
   );
 }

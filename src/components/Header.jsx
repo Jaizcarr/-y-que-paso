@@ -16,14 +16,9 @@ export default function Header({ currentView, selectedSeries, onNavigateHome, se
         >
           <LogoMark className="w-11 h-11 group-hover:brightness-110 transition-all" />
           <div>
-            <div className="flex items-center gap-2">
-              <span className="font-baloo text-2xl font-extrabold tracking-tight text-[var(--text-main)]">
-                Y QUÉ PASÓ?
-              </span>
-              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-[var(--accent-soft)] text-[var(--accent)] border border-[var(--accent)]/30 font-opensans">
-                WIKI
-              </span>
-            </div>
+            <span className="font-baloo text-2xl font-extrabold tracking-tight text-[var(--text-main)]">
+              Y QUÉ PASÓ?
+            </span>
           </div>
         </button>
 

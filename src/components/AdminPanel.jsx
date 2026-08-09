@@ -431,13 +431,12 @@ export default function AdminPanel({ seriesData, onSaveData, onClose }) {
             const eventTitle = row.TituloEvento.toString().trim();
             const explicitEventId = row.EventoID;
 
+            // Events are only matched by an explicit EventoID — unlike character
+            // names, short generic event titles ("Evento 1" vs "Evento 2") are too
+            // similar for fuzzy text matching to tell apart safely.
             let eventObj = null;
             if (explicitEventId !== undefined && explicitEventId !== '') {
               eventObj = charObj.events.find(e => e.id === explicitEventId || e.id === String(explicitEventId));
-            }
-            if (!eventObj) {
-              const fuzzyEvent = findSimilarMatch(eventTitle, charObj.events, { key: 'title', minLength: 3 });
-              if (fuzzyEvent) eventObj = fuzzyEvent.match;
             }
 
             if (!eventObj) {
