@@ -61,3 +61,26 @@ export function findSimilarMatch(query, candidates, { threshold = 0.85, key = 'n
   }
   return best && bestScore >= threshold ? { match: best, score: bestScore } : null;
 }
+
+// Like findSimilarMatch, but also checks each candidate's `aliases` array —
+// alternate names/nicknames/translations declared by the admin (e.g. "Jon Snow"
+// as a known alias of "Jon Nieve (Aegon Targaryen)"). An exact alias match
+// scores 1.0 and always clears the threshold. Candidates need a `name` and
+// optionally an `aliases: string[]`.
+export function findCharacterMatch(query, candidates, { threshold = 0.85, minLength = 4 } = {}) {
+  if (normalizeText(query).length < minLength) return null;
+
+  let best = null;
+  let bestScore = 0;
+  for (const candidate of candidates) {
+    const names = [candidate.name, ...(Array.isArray(candidate.aliases) ? candidate.aliases : [])];
+    for (const name of names) {
+      const score = similarity(query, name);
+      if (score > bestScore) {
+        bestScore = score;
+        best = candidate;
+      }
+    }
+  }
+  return best && bestScore >= threshold ? { match: best, score: bestScore } : null;
+}

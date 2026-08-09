@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Lock, Save, Plus, Trash2, Edit3, RefreshCw, Download, Upload, FileSpreadsheet, Check, AlertCircle, Film, Users, Search, Image, Loader2, KeyRound, Copy, Sparkles, GripVertical, ChevronDown, ChevronUp } from 'lucide-react';
+import { X, Lock, Save, Plus, Trash2, Edit3, RefreshCw, Download, Upload, FileSpreadsheet, Check, AlertCircle, Film, Users, Search, Image, Loader2, KeyRound, Copy, GripVertical, ChevronDown, ChevronUp } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { initialSeriesDatabase } from '../data/seriesData';
 import { PosterPlaceholder } from './Placeholders';
@@ -11,12 +11,7 @@ import {
   getEpisodeStill,
   parseSeasonEpisode,
 } from '../services/tmdb';
-import { findSimilarMatch } from '../utils/similarity';
-import {
-  getClaudeKey,
-  setClaudeKey as persistClaudeKey,
-  findSemanticDuplicate,
-} from '../services/claude';
+import { findSimilarMatch, findCharacterMatch } from '../utils/similarity';
 
 export default function AdminPanel({ seriesData, onSaveData, onClose }) {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -33,11 +28,6 @@ export default function AdminPanel({ seriesData, onSaveData, onClose }) {
   const [expandedCharIds, setExpandedCharIds] = useState(() => new Set());
   const [dragCharIndex, setDragCharIndex] = useState(null);
   const [dragOverCharIndex, setDragOverCharIndex] = useState(null);
-
-  // Claude (Anthropic) semantic duplicate detection — optional, no default key
-  // (unlike TMDB, this key can spend money, so it's never baked into the code).
-  const [claudeKey, setClaudeKeyState] = useState(() => getClaudeKey());
-  const [claudeKeyInput, setClaudeKeyInput] = useState(() => getClaudeKey());
 
   // TMDB automatic image search
   const [tmdbKey, setTmdbKeyState] = useState(() => getTmdbKey());
@@ -172,15 +162,6 @@ export default function AdminPanel({ seriesData, onSaveData, onClose }) {
   const handleCharDragEnd = () => {
     setDragCharIndex(null);
     setDragOverCharIndex(null);
-  };
-
-  // --- Claude semantic duplicate detection ---
-
-  const handleSaveClaudeKey = () => {
-    const trimmed = claudeKeyInput.trim();
-    persistClaudeKey(trimmed);
-    setClaudeKeyState(trimmed);
-    setUploadStatus(trimmed ? 'API Key de Claude guardada en este navegador.' : 'API Key de Claude eliminada.');
   };
 
   // --- TMDB automatic image search ---
@@ -329,8 +310,6 @@ export default function AdminPanel({ seriesData, onSaveData, onClose }) {
         const needsAvatarList = []; // { charObj, actorName }
         const needsEventImageList = []; // { seriesId, eventObj }
         const fuzzyMatchLog = []; // human-readable log of near-duplicate merges
-        let aiChecksUsed = 0;
-        const MAX_AI_CHECKS = 40; // cap Claude calls per upload to bound cost on large files
 
         for (const row of data) {
           const rawSeriesTitle = (row.Serie || 'Juego de Tronos').toString().trim();
@@ -368,40 +347,40 @@ export default function AdminPanel({ seriesData, onSaveData, onClose }) {
 
           const charName = (row.NombrePersonaje || row.Nombre || 'Personaje').toString().trim();
           const explicitCharId = row.PersonajeID;
+          const rawAliases = (row.AliasNombres || row.Alias || row.TambienConocidoComo || '')
+            .toString()
+            .split(/[|,;]/)
+            .map(a => a.trim())
+            .filter(Boolean);
 
+          // 1) Exact ID match (explicit PersonajeID, or one derived from the name)
           let charObj = null;
-          if (explicitCharId) {
-            charObj = currentSeries.characters.find(c => c.id === explicitCharId);
+          if (explicitCharId !== undefined && explicitCharId !== '') {
+            charObj = currentSeries.characters.find(c => c.id === explicitCharId || c.id === String(explicitCharId));
           }
           if (!charObj) {
             const derivedCharId = charName.toLowerCase().replace(/\s+/g, '-');
             charObj = currentSeries.characters.find(c => c.id === derivedCharId);
           }
-          if (!charObj && !explicitCharId) {
-            // No exact ID match — check for a near-duplicate name (small typos, accents, casing)
-            const fuzzyChar = findSimilarMatch(charName, currentSeries.characters, { key: 'name' });
+
+          // 2) No exact ID match (even if the sheet supplied its own PersonajeID scheme
+          // that doesn't line up with ours) — fall back to name/alias similarity so a
+          // sheet using "Jon Snow" still finds "Jon Nieve (Aegon Targaryen)".
+          if (!charObj) {
+            const fuzzyChar = findCharacterMatch(charName, currentSeries.characters);
             if (fuzzyChar) {
               charObj = fuzzyChar.match;
               fuzzyMatchLog.push(`Personaje "${charName}" → "${fuzzyChar.match.name}" (${Math.round(fuzzyChar.score * 100)}% similar)`);
             }
           }
-
-          if (!charObj && !explicitCharId && claudeKey && currentSeries.characters.length > 0 && aiChecksUsed < MAX_AI_CHECKS) {
-            // Text similarity found nothing — ask Claude in case it's a known alias/
-            // translation (e.g. "Jon Snow" vs "Jon Nieve") rather than a distinct character.
-            aiChecksUsed += 1;
-            try {
-              const semanticMatchName = await findSemanticDuplicate(
-                charName,
-                currentSeries.characters.map(c => c.name),
-                claudeKey
-              );
-              if (semanticMatchName) {
-                charObj = currentSeries.characters.find(c => c.name === semanticMatchName);
-                fuzzyMatchLog.push(`Personaje "${charName}" → "${semanticMatchName}" (detectado por IA)`);
+          if (!charObj) {
+            for (const alias of rawAliases) {
+              const aliasMatch = findCharacterMatch(alias, currentSeries.characters);
+              if (aliasMatch) {
+                charObj = aliasMatch.match;
+                fuzzyMatchLog.push(`Personaje "${charName}" (alias "${alias}") → "${aliasMatch.match.name}"`);
+                break;
               }
-            } catch (err) {
-              console.warn(err.message);
             }
           }
 
@@ -409,39 +388,84 @@ export default function AdminPanel({ seriesData, onSaveData, onClose }) {
             charObj = {
               id: explicitCharId || charName.toLowerCase().replace(/\s+/g, '-'),
               name: charName,
-              zona: row.Zona || 'Desconocida',
-              edad: row.Edad || 'N/A',
-              actor: row.Actor || 'N/A',
-              house: row.Casa || 'Casa / Facción',
-              role: row.Rol || 'Protagonista',
-              status: row.Estatus || 'Activo',
-              avatar: row.Avatar || 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=400&q=80',
-              quote: row.Frase || '',
-              summary: row.ResumenPersonaje || 'Resumen del personaje.',
+              aliases: [],
+              zona: 'Desconocida',
+              edad: 'N/A',
+              actor: 'N/A',
+              house: 'Casa / Facción',
+              role: 'Protagonista',
+              status: 'Activo',
+              avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=400&q=80',
+              quote: '',
+              summary: 'Resumen del personaje.',
               events: []
             };
             currentSeries.characters.push(charObj);
           }
 
-          const actorForSearch = row.Actor || charObj.actor;
-          if (actorForSearch && actorForSearch !== 'N/A' && (forceRefreshImages || !row.Avatar)) {
-            needsAvatarList.push({ charObj, actorName: actorForSearch });
+          // Update fields from the row — only overwrite when the row actually provides a
+          // value, so a partial re-upload doesn't blank out data set by an earlier one.
+          if (row.Zona) charObj.zona = row.Zona;
+          if (row.Edad) charObj.edad = row.Edad;
+          if (row.Actor) charObj.actor = row.Actor;
+          if (row.Casa) charObj.house = row.Casa;
+          if (row.Rol) charObj.role = row.Rol;
+          if (row.Estatus) charObj.status = row.Estatus;
+          if (row.Frase) charObj.quote = row.Frase;
+          if (row.ResumenPersonaje) charObj.summary = row.ResumenPersonaje;
+          if (row.Avatar) charObj.avatar = row.Avatar;
+
+          // Remember this row's name/aliases as alternate names for future matching,
+          // without ever changing which name is actually displayed.
+          const knownAliases = new Set(charObj.aliases || []);
+          rawAliases.forEach(a => knownAliases.add(a));
+          if (charName !== charObj.name) knownAliases.add(charName);
+          charObj.aliases = Array.from(knownAliases);
+
+          if (charObj.actor && charObj.actor !== 'N/A' && (forceRefreshImages || !row.Avatar)) {
+            needsAvatarList.push({ charObj, actorName: charObj.actor });
           }
 
-          // Add event if event columns present
+          // Add or update the event if event columns are present
           if (row.TituloEvento) {
-            const eventObj = {
-              id: row.EventoID || `evt-${Date.now()}-${Math.random()}`,
-              season: parseInt(row.Temporada) || 1,
-              episode: row.Episodio || 'T1E1',
-              title: row.TituloEvento,
-              image: row.ImagenEvento || 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?auto=format&fit=crop&w=800&q=80',
-              summary: row.ResumenEvento || 'Resumen del evento',
-              details: row.DetallesCanonicos || row.Detalles || 'Detalles canónicos del evento',
-              impact: row.Impacto || '',
-              isFinalFate: row.EsDestinoFinal === true || row.EsDestinoFinal === 'true' || row.EsDestinoFinal === 1
-            };
-            charObj.events.push(eventObj);
+            const eventTitle = row.TituloEvento.toString().trim();
+            const explicitEventId = row.EventoID;
+
+            let eventObj = null;
+            if (explicitEventId !== undefined && explicitEventId !== '') {
+              eventObj = charObj.events.find(e => e.id === explicitEventId || e.id === String(explicitEventId));
+            }
+            if (!eventObj) {
+              const fuzzyEvent = findSimilarMatch(eventTitle, charObj.events, { key: 'title', minLength: 3 });
+              if (fuzzyEvent) eventObj = fuzzyEvent.match;
+            }
+
+            if (!eventObj) {
+              eventObj = {
+                id: explicitEventId || `evt-${Date.now()}-${Math.random()}`,
+                season: parseInt(row.Temporada) || 1,
+                episode: row.Episodio || 'T1E1',
+                title: eventTitle,
+                image: row.ImagenEvento || 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?auto=format&fit=crop&w=800&q=80',
+                summary: row.ResumenEvento || 'Resumen del evento',
+                details: row.DetallesCanonicos || row.Detalles || 'Detalles canónicos del evento',
+                impact: row.Impacto || '',
+                isFinalFate: row.EsDestinoFinal === true || row.EsDestinoFinal === 'true' || row.EsDestinoFinal === 1
+              };
+              charObj.events.push(eventObj);
+            } else {
+              eventObj.title = eventTitle;
+              if (row.Temporada) eventObj.season = parseInt(row.Temporada) || eventObj.season;
+              if (row.Episodio) eventObj.episode = row.Episodio;
+              if (row.ImagenEvento) eventObj.image = row.ImagenEvento;
+              if (row.ResumenEvento) eventObj.summary = row.ResumenEvento;
+              if (row.DetallesCanonicos || row.Detalles) eventObj.details = row.DetallesCanonicos || row.Detalles;
+              if (row.Impacto) eventObj.impact = row.Impacto;
+              if (row.EsDestinoFinal !== undefined && row.EsDestinoFinal !== '') {
+                eventObj.isFinalFate = row.EsDestinoFinal === true || row.EsDestinoFinal === 'true' || row.EsDestinoFinal === 1;
+              }
+            }
+
             if (forceRefreshImages || !row.ImagenEvento) {
               needsEventImageList.push({ seriesId: currentSeries.id, eventObj });
             }
@@ -521,6 +545,7 @@ export default function AdminPanel({ seriesData, onSaveData, onClose }) {
         Serie: 'Juego de Tronos',
         PersonajeID: 'jon-snow',
         NombrePersonaje: 'Jon Nieve',
+        AliasNombres: 'Jon Snow, Aegon Targaryen',
         Zona: 'Invernalia & El Muro',
         Edad: '24 años',
         Actor: 'Kit Harington',
@@ -541,6 +566,10 @@ export default function AdminPanel({ seriesData, onSaveData, onClose }) {
         EsDestinoFinal: 'true'
       }
     ];
+    // Nota: Actor y Temporada/Episodio son necesarios para que la búsqueda automática
+    // de imágenes en TMDB funcione (foto del actor y captura del episodio, respectivamente).
+    // AliasNombres es opcional: nombres alternativos (separados por coma) para detectar
+    // duplicados aunque el nombre principal varíe.
 
     const worksheet = XLSX.utils.json_to_sheet(templateRows);
     const workbook = XLSX.utils.book_new();
@@ -768,56 +797,6 @@ export default function AdminPanel({ seriesData, onSaveData, onClose }) {
               )}
             </div>
 
-            {/* CLAUDE AI SEMANTIC DUPLICATE DETECTION BOX (optional) */}
-            <div className="p-5 rounded-2xl bg-sky-300/10 border border-sky-300/30 space-y-3">
-              <div>
-                <h3 className="text-base font-bold text-sky-200 font-baloo flex items-center gap-2">
-                  <Sparkles className="w-5 h-5 text-sky-300" />
-                  Detección de Duplicados con IA (opcional)
-                </h3>
-                <p className="text-xs text-gray-300">
-                  Durante la carga masiva por Excel, si un nombre no coincide ni por texto (typos/acentos) se consulta a Claude por si es un alias o traducción del mismo personaje (ej. "Jon Snow" = "Jon Nieve"). Necesita tu propia{' '}
-                  <a
-                    href="https://console.anthropic.com/settings/keys"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-sky-200 underline hover:text-sky-100"
-                  >
-                    API Key de Anthropic
-                  </a>{' '}
-                  — tiene coste por uso y por seguridad nunca se guarda en el código, solo en este navegador.
-                </p>
-              </div>
-
-              <div className="flex items-center gap-2 flex-wrap">
-                <div className="flex items-center gap-1.5 bg-black/50 rounded-xl border border-white/15 px-3 py-2">
-                  <KeyRound className="w-3.5 h-3.5 text-sky-300 shrink-0" />
-                  <input
-                    type="text"
-                    autoComplete="off"
-                    autoCorrect="off"
-                    spellCheck="false"
-                    placeholder="Pega aquí tu API Key de Anthropic (sk-ant-...)"
-                    value={claudeKeyInput}
-                    onChange={(e) => setClaudeKeyInput(e.target.value)}
-                    className="bg-transparent text-xs text-gray-100 focus:outline-none w-72"
-                  />
-                </div>
-                <button
-                  onClick={handleSaveClaudeKey}
-                  className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-sky-300/20 hover:bg-sky-300/30 text-sky-200 border border-sky-300/40 text-xs font-bold transition-all"
-                >
-                  <Save className="w-3.5 h-3.5" /> Guardar Key
-                </button>
-
-                {claudeKey && (
-                  <span className="text-[10px] text-emerald-300 font-semibold flex items-center gap-1">
-                    <Check className="w-3 h-3" /> Key configurada — la carga masiva verificará duplicados con IA
-                  </span>
-                )}
-              </div>
-            </div>
-
             {/* Global Controls */}
             <div className="flex flex-wrap items-center justify-between gap-4 p-4 rounded-2xl bg-black/40 border border-white/10">
               <div className="flex items-center gap-3">
@@ -990,6 +969,19 @@ export default function AdminPanel({ seriesData, onSaveData, onClose }) {
                                   className="w-full bg-black/50 text-white px-2.5 py-1.5 rounded-lg border border-white/15"
                                 />
                               </div>
+                            </div>
+
+                            <div>
+                              <label className="text-[10px] text-gray-400 block mb-1">
+                                Alias / También conocido como (separados por coma) — se usan para detectar duplicados, no se muestran en la wiki
+                              </label>
+                              <input
+                                type="text"
+                                placeholder="ej: Jon Snow, Aegon Targaryen"
+                                value={(char.aliases || []).join(', ')}
+                                onChange={(e) => handleUpdateCharacter(char.id, 'aliases', e.target.value.split(',').map(a => a.trim()).filter(Boolean))}
+                                className="w-full bg-black/50 text-white px-2.5 py-1.5 rounded-lg border border-white/15 text-xs"
+                              />
                             </div>
 
                             {/* Events Quick Manager */}

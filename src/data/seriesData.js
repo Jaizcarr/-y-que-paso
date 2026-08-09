@@ -15,6 +15,7 @@ export const initialSeriesDatabase = [
       {
         id: "jon-snow",
         name: "Jon Nieve (Aegon Targaryen)",
+        aliases: ["Jon Snow", "Aegon Targaryen", "Jon Targaryen"],
         zona: "El Muro & Invernalia",
         edad: "24 - 32 años",
         actor: "Kit Harington",
@@ -311,6 +312,7 @@ export const initialSeriesDatabase = [
       {
         id: "eleven",
         name: "Once (Eleven / Jane Hopper)",
+        aliases: ["Eleven", "Jane Hopper", "Once", "El", "Jane Ives"],
         zona: "Hawkins, Indiana",
         edad: "12 - 18 años",
         actor: "Millie Bobby Brown",
