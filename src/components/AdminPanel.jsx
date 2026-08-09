@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Lock, Save, Plus, Trash2, Edit3, RefreshCw, Download, Upload, FileSpreadsheet, Check, AlertCircle, Film, Users, Search, Image, Loader2, KeyRound, Copy, Sparkles } from 'lucide-react';
+import { X, Lock, Save, Plus, Trash2, Edit3, RefreshCw, Download, Upload, FileSpreadsheet, Check, AlertCircle, Film, Users, Search, Image, Loader2, KeyRound, Copy, Sparkles, GripVertical, ChevronDown, ChevronUp } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { initialSeriesDatabase } from '../data/seriesData';
 import { PosterPlaceholder } from './Placeholders';
@@ -28,6 +28,11 @@ export default function AdminPanel({ seriesData, onSaveData, onClose }) {
   const [selectedSeriesId, setSelectedSeriesId] = useState(seriesData[0]?.id || '');
   const [uploadStatus, setUploadStatus] = useState('');
   const [forceRefreshImages, setForceRefreshImages] = useState(false);
+
+  // Character card collapse/expand + drag-to-reorder
+  const [expandedCharIds, setExpandedCharIds] = useState(() => new Set());
+  const [dragCharIndex, setDragCharIndex] = useState(null);
+  const [dragOverCharIndex, setDragOverCharIndex] = useState(null);
 
   // Claude (Anthropic) semantic duplicate detection — optional, no default key
   // (unlike TMDB, this key can spend money, so it's never baked into the code).
@@ -110,6 +115,63 @@ export default function AdminPanel({ seriesData, onSaveData, onClose }) {
         characters: s.characters.map(c => c.id === charId ? { ...c, events: c.events.filter(e => e.id !== eventId) } : c)
       };
     }));
+  };
+
+  const handleDeleteCharacter = (charId, charName) => {
+    if (!confirm(`¿Borrar a "${charName}" y todos sus eventos canónicos? Esta acción no se puede deshacer.`)) return;
+    setEditableData(prev => prev.map(s => {
+      if (s.id !== selectedSeriesId) return s;
+      return { ...s, characters: s.characters.filter(c => c.id !== charId) };
+    }));
+    setExpandedCharIds(prev => {
+      const next = new Set(prev);
+      next.delete(charId);
+      return next;
+    });
+  };
+
+  const toggleCharExpanded = (charId) => {
+    setExpandedCharIds(prev => {
+      const next = new Set(prev);
+      if (next.has(charId)) next.delete(charId);
+      else next.add(charId);
+      return next;
+    });
+  };
+
+  // --- Drag-to-reorder character cards ---
+  const handleCharDragStart = (index) => (e) => {
+    setDragCharIndex(index);
+    e.dataTransfer.effectAllowed = 'move';
+  };
+
+  const handleCharDragOver = (index) => (e) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    if (index !== dragOverCharIndex) setDragOverCharIndex(index);
+  };
+
+  const handleCharDrop = (index) => (e) => {
+    e.preventDefault();
+    if (dragCharIndex === null || dragCharIndex === index) {
+      setDragCharIndex(null);
+      setDragOverCharIndex(null);
+      return;
+    }
+    setEditableData(prev => prev.map(s => {
+      if (s.id !== selectedSeriesId) return s;
+      const reordered = [...s.characters];
+      const [moved] = reordered.splice(dragCharIndex, 1);
+      reordered.splice(index, 0, moved);
+      return { ...s, characters: reordered };
+    }));
+    setDragCharIndex(null);
+    setDragOverCharIndex(null);
+  };
+
+  const handleCharDragEnd = () => {
+    setDragCharIndex(null);
+    setDragOverCharIndex(null);
   };
 
   // --- Claude semantic duplicate detection ---
@@ -820,116 +882,162 @@ export default function AdminPanel({ seriesData, onSaveData, onClose }) {
                 <h3 className="text-sm font-bold text-rose-300 uppercase tracking-wider flex items-center gap-1.5 font-baloo">
                   <Users className="w-4 h-4" /> Personajes de {selectedSeries.title} ({selectedSeries.characters.length})
                 </h3>
+                <p className="text-[11px] text-gray-500 -mt-2">
+                  Arrastra el icono ⠿ para reordenar. Haz clic en una tarjeta para ver/ocultar sus eventos.
+                </p>
 
-                <div className="space-y-4">
-                  {selectedSeries.characters.map((char) => (
-                    <div key={char.id} className="p-4 rounded-2xl glass-panel border border-white/10 space-y-3">
-                      
-                      <div className="flex items-center justify-between border-b border-white/10 pb-2">
-                        <div className="flex items-center gap-3">
-                          <img src={char.avatar} alt={char.name} className="w-9 h-9 rounded-full object-cover border border-rose-300" />
-                          <div>
-                            <span className="text-sm font-bold text-white block">{char.name}</span>
-                            <span className="text-[11px] text-gray-400">Zona: {char.zona} • Edad Real: {char.edad} • Actor: {char.actor}</span>
+                <div className="space-y-3">
+                  {selectedSeries.characters.map((char, index) => {
+                    const isExpanded = expandedCharIds.has(char.id);
+                    const isDragging = dragCharIndex === index;
+                    const isDragOver = dragOverCharIndex === index && dragCharIndex !== null && dragCharIndex !== index;
+
+                    return (
+                      <div
+                        key={char.id}
+                        onDragOver={handleCharDragOver(index)}
+                        onDrop={handleCharDrop(index)}
+                        className={`rounded-2xl glass-panel border transition-all ${
+                          isDragOver ? 'border-[var(--accent)] ring-2 ring-[var(--accent)]/40' : 'border-white/10'
+                        } ${isDragging ? 'opacity-40' : 'opacity-100'}`}
+                      >
+                        <div
+                          onClick={() => toggleCharExpanded(char.id)}
+                          className="flex items-center justify-between p-4 cursor-pointer select-none"
+                        >
+                          <div className="flex items-center gap-3 min-w-0">
+                            <span
+                              draggable
+                              onDragStart={handleCharDragStart(index)}
+                              onDragEnd={handleCharDragEnd}
+                              onClick={(e) => e.stopPropagation()}
+                              title="Arrastra para reordenar"
+                              className="cursor-grab active:cursor-grabbing text-gray-500 hover:text-gray-300 p-1 shrink-0"
+                            >
+                              <GripVertical className="w-4 h-4" />
+                            </span>
+                            <img src={char.avatar} alt={char.name} className="w-9 h-9 rounded-full object-cover border border-rose-300 shrink-0" />
+                            <div className="min-w-0">
+                              <span className="text-sm font-bold text-white block truncate">{char.name}</span>
+                              <span className="text-[11px] text-gray-400 block truncate">Zona: {char.zona} • Edad Real: {char.edad} • Actor: {char.actor}</span>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-2 shrink-0">
+                            <span className="text-[10px] text-gray-500 hidden sm:inline">{char.events.length} eventos</span>
+                            <button
+                              onClick={(e) => { e.stopPropagation(); handleDeleteCharacter(char.id, char.name); }}
+                              title="Borrar personaje"
+                              className="p-1.5 rounded-lg bg-rose-400/10 hover:bg-rose-400/25 text-rose-300 hover:text-white transition-all"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                            {isExpanded ? <ChevronUp className="w-4 h-4 text-gray-400" /> : <ChevronDown className="w-4 h-4 text-gray-400" />}
                           </div>
                         </div>
-                        <button
-                          onClick={() => handleSearchAvatar(char)}
-                          disabled={!tmdbKey || searchingKey === `avatar-${char.id}`}
-                          title="Buscar foto real del actor en TMDB"
-                          className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-purple-300/15 hover:bg-purple-300/25 disabled:opacity-40 disabled:cursor-not-allowed text-purple-200 border border-purple-300/30 text-[10px] font-bold transition-all shrink-0"
-                        >
-                          {searchingKey === `avatar-${char.id}` ? <Loader2 className="w-3 h-3 animate-spin" /> : <Search className="w-3 h-3" />}
-                          Avatar TMDB
-                        </button>
-                      </div>
 
-                      <div className="grid grid-cols-1 sm:grid-cols-4 gap-2 text-xs">
-                        <div>
-                          <label className="text-[10px] text-gray-400 block mb-1">Nombre</label>
-                          <input
-                            type="text"
-                            value={char.name}
-                            onChange={(e) => handleUpdateCharacter(char.id, 'name', e.target.value)}
-                            className="w-full bg-black/50 text-white px-2.5 py-1.5 rounded-lg border border-white/15"
-                          />
-                        </div>
-
-                        <div>
-                          <label className="text-[10px] text-gray-400 block mb-1">Zona / Origen</label>
-                          <input
-                            type="text"
-                            value={char.zona || ''}
-                            onChange={(e) => handleUpdateCharacter(char.id, 'zona', e.target.value)}
-                            className="w-full bg-black/50 text-white px-2.5 py-1.5 rounded-lg border border-white/15"
-                          />
-                        </div>
-
-                        <div>
-                          <label className="text-[10px] text-gray-400 block mb-1">Edad Real del Actor</label>
-                          <input
-                            type="text"
-                            value={char.edad || ''}
-                            onChange={(e) => handleUpdateCharacter(char.id, 'edad', e.target.value)}
-                            className="w-full bg-black/50 text-white px-2.5 py-1.5 rounded-lg border border-white/15"
-                          />
-                        </div>
-
-                        <div>
-                          <label className="text-[10px] text-gray-400 block mb-1">Actor / Actriz</label>
-                          <input
-                            type="text"
-                            value={char.actor || ''}
-                            onChange={(e) => handleUpdateCharacter(char.id, 'actor', e.target.value)}
-                            className="w-full bg-black/50 text-white px-2.5 py-1.5 rounded-lg border border-white/15"
-                          />
-                        </div>
-                      </div>
-
-                      {/* Events Quick Manager */}
-                      <div className="pt-2">
-                        <div className="flex items-center justify-between mb-1.5">
-                          <span className="text-xs font-bold text-amber-200">Eventos Canónicos ({char.events.length})</span>
-                          <button
-                            onClick={() => handleAddEvent(char.id)}
-                            className="text-[11px] text-emerald-300 font-bold hover:underline flex items-center gap-1"
-                          >
-                            <Plus className="w-3.5 h-3.5" /> Añadir Evento
-                          </button>
-                        </div>
-
-                        <div className="space-y-1.5">
-                          {char.events.map((evt, idx) => (
-                            <div key={evt.id || idx} className="p-2.5 rounded-xl bg-black/40 border border-white/10 flex items-center justify-between text-xs gap-2">
-                              <img src={evt.image} alt="" className="w-8 h-8 rounded-lg object-cover border border-white/10 shrink-0" />
-                              <div className="flex-1 truncate">
-                                <span className="font-bold text-white">{evt.episode}: </span>
-                                <span className="text-gray-300">{evt.title}</span>
-                                {idx === char.events.length - 1 && (
-                                  <span className="ml-2 px-1.5 py-0.5 text-[9px] bg-amber-300/20 text-amber-200 rounded border border-amber-300/40">Burbuja Final</span>
-                                )}
-                              </div>
+                        {isExpanded && (
+                          <div className="px-4 pb-4 space-y-3 border-t border-white/10 pt-3">
+                            <div className="flex justify-end">
                               <button
-                                onClick={() => handleSearchEventImage(char, evt)}
-                                disabled={!tmdbKey || searchingKey === `event-${evt.id}`}
-                                title="Buscar captura real del episodio en TMDB"
-                                className="flex items-center gap-1 px-2 py-1 rounded-lg bg-purple-300/15 hover:bg-purple-300/25 disabled:opacity-40 disabled:cursor-not-allowed text-purple-200 border border-purple-300/30 text-[9px] font-bold transition-all shrink-0"
+                                onClick={() => handleSearchAvatar(char)}
+                                disabled={!tmdbKey || searchingKey === `avatar-${char.id}`}
+                                title="Buscar foto real del actor en TMDB"
+                                className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-purple-300/15 hover:bg-purple-300/25 disabled:opacity-40 disabled:cursor-not-allowed text-purple-200 border border-purple-300/30 text-[10px] font-bold transition-all shrink-0"
                               >
-                                {searchingKey === `event-${evt.id}` ? <Loader2 className="w-3 h-3 animate-spin" /> : <Search className="w-3 h-3" />}
-                              </button>
-                              <button
-                                onClick={() => handleDeleteEvent(char.id, evt.id)}
-                                className="text-rose-300 p-1 hover:text-white"
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
+                                {searchingKey === `avatar-${char.id}` ? <Loader2 className="w-3 h-3 animate-spin" /> : <Search className="w-3 h-3" />}
+                                Avatar TMDB
                               </button>
                             </div>
-                          ))}
-                        </div>
-                      </div>
 
-                    </div>
-                  ))}
+                            <div className="grid grid-cols-1 sm:grid-cols-4 gap-2 text-xs">
+                              <div>
+                                <label className="text-[10px] text-gray-400 block mb-1">Nombre</label>
+                                <input
+                                  type="text"
+                                  value={char.name}
+                                  onChange={(e) => handleUpdateCharacter(char.id, 'name', e.target.value)}
+                                  className="w-full bg-black/50 text-white px-2.5 py-1.5 rounded-lg border border-white/15"
+                                />
+                              </div>
+
+                              <div>
+                                <label className="text-[10px] text-gray-400 block mb-1">Zona / Origen</label>
+                                <input
+                                  type="text"
+                                  value={char.zona || ''}
+                                  onChange={(e) => handleUpdateCharacter(char.id, 'zona', e.target.value)}
+                                  className="w-full bg-black/50 text-white px-2.5 py-1.5 rounded-lg border border-white/15"
+                                />
+                              </div>
+
+                              <div>
+                                <label className="text-[10px] text-gray-400 block mb-1">Edad Real del Actor</label>
+                                <input
+                                  type="text"
+                                  value={char.edad || ''}
+                                  onChange={(e) => handleUpdateCharacter(char.id, 'edad', e.target.value)}
+                                  className="w-full bg-black/50 text-white px-2.5 py-1.5 rounded-lg border border-white/15"
+                                />
+                              </div>
+
+                              <div>
+                                <label className="text-[10px] text-gray-400 block mb-1">Actor / Actriz</label>
+                                <input
+                                  type="text"
+                                  value={char.actor || ''}
+                                  onChange={(e) => handleUpdateCharacter(char.id, 'actor', e.target.value)}
+                                  className="w-full bg-black/50 text-white px-2.5 py-1.5 rounded-lg border border-white/15"
+                                />
+                              </div>
+                            </div>
+
+                            {/* Events Quick Manager */}
+                            <div className="pt-2">
+                              <div className="flex items-center justify-between mb-1.5">
+                                <span className="text-xs font-bold text-amber-200">Eventos Canónicos ({char.events.length})</span>
+                                <button
+                                  onClick={() => handleAddEvent(char.id)}
+                                  className="text-[11px] text-emerald-300 font-bold hover:underline flex items-center gap-1"
+                                >
+                                  <Plus className="w-3.5 h-3.5" /> Añadir Evento
+                                </button>
+                              </div>
+
+                              <div className="space-y-1.5">
+                                {char.events.map((evt, idx) => (
+                                  <div key={evt.id || idx} className="p-2.5 rounded-xl bg-black/40 border border-white/10 flex items-center justify-between text-xs gap-2">
+                                    <img src={evt.image} alt="" className="w-8 h-8 rounded-lg object-cover border border-white/10 shrink-0" />
+                                    <div className="flex-1 truncate">
+                                      <span className="font-bold text-white">{evt.episode}: </span>
+                                      <span className="text-gray-300">{evt.title}</span>
+                                      {idx === char.events.length - 1 && (
+                                        <span className="ml-2 px-1.5 py-0.5 text-[9px] bg-amber-300/20 text-amber-200 rounded border border-amber-300/40">Burbuja Final</span>
+                                      )}
+                                    </div>
+                                    <button
+                                      onClick={() => handleSearchEventImage(char, evt)}
+                                      disabled={!tmdbKey || searchingKey === `event-${evt.id}`}
+                                      title="Buscar captura real del episodio en TMDB"
+                                      className="flex items-center gap-1 px-2 py-1 rounded-lg bg-purple-300/15 hover:bg-purple-300/25 disabled:opacity-40 disabled:cursor-not-allowed text-purple-200 border border-purple-300/30 text-[9px] font-bold transition-all shrink-0"
+                                    >
+                                      {searchingKey === `event-${evt.id}` ? <Loader2 className="w-3 h-3 animate-spin" /> : <Search className="w-3 h-3" />}
+                                    </button>
+                                    <button
+                                      onClick={() => handleDeleteEvent(char.id, evt.id)}
+                                      className="text-rose-300 p-1 hover:text-white"
+                                    >
+                                      <Trash2 className="w-3.5 h-3.5" />
+                                    </button>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             )}
