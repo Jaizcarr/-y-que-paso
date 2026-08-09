@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Lock, Save, Plus, Trash2, Edit3, RefreshCw, Download, Upload, FileSpreadsheet, Check, AlertCircle, Film, Users, Search, Image, Loader2, KeyRound, Copy } from 'lucide-react';
+import { X, Lock, Save, Plus, Trash2, Edit3, RefreshCw, Download, Upload, FileSpreadsheet, Check, AlertCircle, Film, Users, Search, Image, Loader2, KeyRound, Copy, Sparkles } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { initialSeriesDatabase } from '../data/seriesData';
 import { PosterPlaceholder } from './Placeholders';
@@ -11,6 +11,12 @@ import {
   getEpisodeStill,
   parseSeasonEpisode,
 } from '../services/tmdb';
+import { findSimilarMatch } from '../utils/similarity';
+import {
+  getClaudeKey,
+  setClaudeKey as persistClaudeKey,
+  findSemanticDuplicate,
+} from '../services/claude';
 
 export default function AdminPanel({ seriesData, onSaveData, onClose }) {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -21,6 +27,12 @@ export default function AdminPanel({ seriesData, onSaveData, onClose }) {
   const [editableData, setEditableData] = useState(seriesData);
   const [selectedSeriesId, setSelectedSeriesId] = useState(seriesData[0]?.id || '');
   const [uploadStatus, setUploadStatus] = useState('');
+  const [forceRefreshImages, setForceRefreshImages] = useState(false);
+
+  // Claude (Anthropic) semantic duplicate detection — optional, no default key
+  // (unlike TMDB, this key can spend money, so it's never baked into the code).
+  const [claudeKey, setClaudeKeyState] = useState(() => getClaudeKey());
+  const [claudeKeyInput, setClaudeKeyInput] = useState(() => getClaudeKey());
 
   // TMDB automatic image search
   const [tmdbKey, setTmdbKeyState] = useState(() => getTmdbKey());
@@ -98,6 +110,15 @@ export default function AdminPanel({ seriesData, onSaveData, onClose }) {
         characters: s.characters.map(c => c.id === charId ? { ...c, events: c.events.filter(e => e.id !== eventId) } : c)
       };
     }));
+  };
+
+  // --- Claude semantic duplicate detection ---
+
+  const handleSaveClaudeKey = () => {
+    const trimmed = claudeKeyInput.trim();
+    persistClaudeKey(trimmed);
+    setClaudeKeyState(trimmed);
+    setUploadStatus(trimmed ? 'API Key de Claude guardada en este navegador.' : 'API Key de Claude eliminada.');
   };
 
   // --- TMDB automatic image search ---
@@ -245,17 +266,29 @@ export default function AdminPanel({ seriesData, onSaveData, onClose }) {
         const needsPosterIds = new Set();
         const needsAvatarList = []; // { charObj, actorName }
         const needsEventImageList = []; // { seriesId, eventObj }
+        const fuzzyMatchLog = []; // human-readable log of near-duplicate merges
+        let aiChecksUsed = 0;
+        const MAX_AI_CHECKS = 40; // cap Claude calls per upload to bound cost on large files
 
-        data.forEach(row => {
-          const seriesTitle = row.Serie || 'Juego de Tronos';
-          const seriesKey = seriesTitle.toLowerCase();
-          const seriesId = seriesTitle.toLowerCase().replace(/\s+/g, '-');
+        for (const row of data) {
+          const rawSeriesTitle = (row.Serie || 'Juego de Tronos').toString().trim();
+          let seriesKey = rawSeriesTitle.toLowerCase();
+
+          // Fuzzy-match against already-known series titles before creating a new one
+          // (catches typos/casing/accents like "Juego de tronos " vs "Juego de Tronos").
+          if (!newSeriesMap[seriesKey]) {
+            const fuzzySeries = findSimilarMatch(rawSeriesTitle, Object.values(newSeriesMap), { key: 'title' });
+            if (fuzzySeries) {
+              seriesKey = fuzzySeries.match.title.toLowerCase();
+              fuzzyMatchLog.push(`Serie "${rawSeriesTitle}" → "${fuzzySeries.match.title}" (${Math.round(fuzzySeries.score * 100)}% similar)`);
+            }
+          }
 
           if (!newSeriesMap[seriesKey]) {
             newSeriesMap[seriesKey] = {
-              id: seriesId,
-              title: seriesTitle,
-              originalTitle: seriesTitle,
+              id: rawSeriesTitle.toLowerCase().replace(/\s+/g, '-'),
+              title: rawSeriesTitle,
+              originalTitle: rawSeriesTitle,
               poster: row.PosterSerie || null,
               backdrop: row.BackdropSerie || 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?auto=format&fit=crop&w=1600&q=80',
               genre: row.GeneroSerie || 'Drama',
@@ -266,16 +299,53 @@ export default function AdminPanel({ seriesData, onSaveData, onClose }) {
               description: row.DescripcionSerie || 'Descripción de la serie.',
               characters: []
             };
-            if (!row.PosterSerie) needsPosterIds.add(newSeriesMap[seriesKey].id);
           }
 
-          const charName = row.NombrePersonaje || row.Nombre || 'Personaje';
-          const charId = row.PersonajeID || charName.toLowerCase().replace(/\s+/g, '-');
+          const currentSeries = newSeriesMap[seriesKey];
+          if (forceRefreshImages || !row.PosterSerie) needsPosterIds.add(currentSeries.id);
 
-          let charObj = newSeriesMap[seriesKey].characters.find(c => c.id === charId);
+          const charName = (row.NombrePersonaje || row.Nombre || 'Personaje').toString().trim();
+          const explicitCharId = row.PersonajeID;
+
+          let charObj = null;
+          if (explicitCharId) {
+            charObj = currentSeries.characters.find(c => c.id === explicitCharId);
+          }
+          if (!charObj) {
+            const derivedCharId = charName.toLowerCase().replace(/\s+/g, '-');
+            charObj = currentSeries.characters.find(c => c.id === derivedCharId);
+          }
+          if (!charObj && !explicitCharId) {
+            // No exact ID match — check for a near-duplicate name (small typos, accents, casing)
+            const fuzzyChar = findSimilarMatch(charName, currentSeries.characters, { key: 'name' });
+            if (fuzzyChar) {
+              charObj = fuzzyChar.match;
+              fuzzyMatchLog.push(`Personaje "${charName}" → "${fuzzyChar.match.name}" (${Math.round(fuzzyChar.score * 100)}% similar)`);
+            }
+          }
+
+          if (!charObj && !explicitCharId && claudeKey && currentSeries.characters.length > 0 && aiChecksUsed < MAX_AI_CHECKS) {
+            // Text similarity found nothing — ask Claude in case it's a known alias/
+            // translation (e.g. "Jon Snow" vs "Jon Nieve") rather than a distinct character.
+            aiChecksUsed += 1;
+            try {
+              const semanticMatchName = await findSemanticDuplicate(
+                charName,
+                currentSeries.characters.map(c => c.name),
+                claudeKey
+              );
+              if (semanticMatchName) {
+                charObj = currentSeries.characters.find(c => c.name === semanticMatchName);
+                fuzzyMatchLog.push(`Personaje "${charName}" → "${semanticMatchName}" (detectado por IA)`);
+              }
+            } catch (err) {
+              console.warn(err.message);
+            }
+          }
+
           if (!charObj) {
             charObj = {
-              id: charId,
+              id: explicitCharId || charName.toLowerCase().replace(/\s+/g, '-'),
               name: charName,
               zona: row.Zona || 'Desconocida',
               edad: row.Edad || 'N/A',
@@ -288,10 +358,12 @@ export default function AdminPanel({ seriesData, onSaveData, onClose }) {
               summary: row.ResumenPersonaje || 'Resumen del personaje.',
               events: []
             };
-            newSeriesMap[seriesKey].characters.push(charObj);
-            if (!row.Avatar && row.Actor) {
-              needsAvatarList.push({ charObj, actorName: row.Actor });
-            }
+            currentSeries.characters.push(charObj);
+          }
+
+          const actorForSearch = row.Actor || charObj.actor;
+          if (actorForSearch && actorForSearch !== 'N/A' && (forceRefreshImages || !row.Avatar)) {
+            needsAvatarList.push({ charObj, actorName: actorForSearch });
           }
 
           // Add event if event columns present
@@ -308,11 +380,11 @@ export default function AdminPanel({ seriesData, onSaveData, onClose }) {
               isFinalFate: row.EsDestinoFinal === true || row.EsDestinoFinal === 'true' || row.EsDestinoFinal === 1
             };
             charObj.events.push(eventObj);
-            if (!row.ImagenEvento) {
-              needsEventImageList.push({ seriesId: newSeriesMap[seriesKey].id, eventObj });
+            if (forceRefreshImages || !row.ImagenEvento) {
+              needsEventImageList.push({ seriesId: currentSeries.id, eventObj });
             }
           }
-        });
+        }
 
         const currentTmdbKey = getTmdbKey();
         const pendingImages = needsPosterIds.size + needsAvatarList.length + needsEventImageList.length;
@@ -360,11 +432,16 @@ export default function AdminPanel({ seriesData, onSaveData, onClose }) {
         setEditableData(updatedArray);
         onSaveData(updatedArray);
 
+        const parts = [`¡Éxito! Se importaron ${data.length} filas del Excel/CSV.`];
         if (currentTmdbKey && pendingImages > 0) {
-          setUploadStatus(`¡Éxito! Se importaron ${data.length} filas y se autocompletaron imágenes vía TMDB.`);
-        } else {
-          setUploadStatus(`¡Éxito! Se importaron ${data.length} filas del Excel/CSV.`);
+          parts.push(`Se autocompletaron ${pendingImages} imágenes vía TMDB.`);
         }
+        if (fuzzyMatchLog.length > 0) {
+          const preview = fuzzyMatchLog.slice(0, 3).join(' · ');
+          const extra = fuzzyMatchLog.length > 3 ? ` y ${fuzzyMatchLog.length - 3} más` : '';
+          parts.push(`Se detectaron ${fuzzyMatchLog.length} posibles duplicados y se fusionaron en vez de crear personajes nuevos: ${preview}${extra}.`);
+        }
+        setUploadStatus(parts.join(' '));
 
       } catch (err) {
         console.error(err);
@@ -519,7 +596,7 @@ export default function AdminPanel({ seriesData, onSaveData, onClose }) {
               </div>
 
               {/* Upload Input */}
-              <div className="flex items-center gap-4 pt-2">
+              <div className="flex items-center gap-4 pt-2 flex-wrap">
                 <label className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-rose-400/20 hover:bg-rose-400/30 text-rose-200 border border-rose-300/40 text-xs font-bold cursor-pointer transition-all">
                   <Upload className="w-4 h-4" /> Seleccionar Archivo Excel/CSV
                   <input
@@ -530,12 +607,22 @@ export default function AdminPanel({ seriesData, onSaveData, onClose }) {
                   />
                 </label>
 
-                {uploadStatus && (
-                  <span className="text-xs font-semibold text-emerald-300">
-                    {uploadStatus}
-                  </span>
-                )}
+                <label className="flex items-center gap-1.5 text-xs text-gray-300 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={forceRefreshImages}
+                    onChange={(e) => setForceRefreshImages(e.target.checked)}
+                    className="accent-[var(--accent)]"
+                  />
+                  Forzar actualización de imágenes con TMDB (incluso si el Excel ya trae una URL)
+                </label>
               </div>
+
+              {uploadStatus && (
+                <p className="text-xs font-semibold text-emerald-300 bg-emerald-950/20 px-3 py-2 rounded-lg">
+                  {uploadStatus}
+                </p>
+              )}
             </div>
 
             {/* TMDB AUTOMATIC IMAGE SEARCH BOX */}
@@ -617,6 +704,56 @@ export default function AdminPanel({ seriesData, onSaveData, onClose }) {
                   {tmdbStatus}
                 </p>
               )}
+            </div>
+
+            {/* CLAUDE AI SEMANTIC DUPLICATE DETECTION BOX (optional) */}
+            <div className="p-5 rounded-2xl bg-sky-300/10 border border-sky-300/30 space-y-3">
+              <div>
+                <h3 className="text-base font-bold text-sky-200 font-baloo flex items-center gap-2">
+                  <Sparkles className="w-5 h-5 text-sky-300" />
+                  Detección de Duplicados con IA (opcional)
+                </h3>
+                <p className="text-xs text-gray-300">
+                  Durante la carga masiva por Excel, si un nombre no coincide ni por texto (typos/acentos) se consulta a Claude por si es un alias o traducción del mismo personaje (ej. "Jon Snow" = "Jon Nieve"). Necesita tu propia{' '}
+                  <a
+                    href="https://console.anthropic.com/settings/keys"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-sky-200 underline hover:text-sky-100"
+                  >
+                    API Key de Anthropic
+                  </a>{' '}
+                  — tiene coste por uso y por seguridad nunca se guarda en el código, solo en este navegador.
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2 flex-wrap">
+                <div className="flex items-center gap-1.5 bg-black/50 rounded-xl border border-white/15 px-3 py-2">
+                  <KeyRound className="w-3.5 h-3.5 text-sky-300 shrink-0" />
+                  <input
+                    type="text"
+                    autoComplete="off"
+                    autoCorrect="off"
+                    spellCheck="false"
+                    placeholder="Pega aquí tu API Key de Anthropic (sk-ant-...)"
+                    value={claudeKeyInput}
+                    onChange={(e) => setClaudeKeyInput(e.target.value)}
+                    className="bg-transparent text-xs text-gray-100 focus:outline-none w-72"
+                  />
+                </div>
+                <button
+                  onClick={handleSaveClaudeKey}
+                  className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-sky-300/20 hover:bg-sky-300/30 text-sky-200 border border-sky-300/40 text-xs font-bold transition-all"
+                >
+                  <Save className="w-3.5 h-3.5" /> Guardar Key
+                </button>
+
+                {claudeKey && (
+                  <span className="text-[10px] text-emerald-300 font-semibold flex items-center gap-1">
+                    <Check className="w-3 h-3" /> Key configurada — la carga masiva verificará duplicados con IA
+                  </span>
+                )}
+              </div>
             </div>
 
             {/* Global Controls */}
