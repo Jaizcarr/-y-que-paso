@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Lock, Save, Plus, Trash2, Edit3, RefreshCw, Download, Upload, FileSpreadsheet, Check, AlertCircle, Film, Users, Search, Image, Loader2, KeyRound, Copy, GripVertical, ChevronDown, ChevronUp } from 'lucide-react';
+import { X, Lock, Save, Plus, Trash2, Edit3, RefreshCw, Download, Upload, FileSpreadsheet, Check, AlertCircle, Film, Users, Search, Image, Loader2, KeyRound, Copy, GripVertical, ChevronDown, ChevronUp, MessageCircle } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { initialSeriesDatabase } from '../data/seriesData';
 import { PosterPlaceholder } from './Placeholders';
@@ -13,6 +13,7 @@ import {
 } from '../services/tmdb';
 import { findSimilarMatch, findCharacterMatch } from '../utils/similarity';
 import { runWithConcurrency } from '../utils/concurrency';
+import { fetchSuggestions, deleteSuggestion } from '../services/suggestions';
 import { supabase } from '../services/supabaseClient';
 import { useModalA11y } from '../hooks/useModalA11y';
 
@@ -47,6 +48,34 @@ export default function AdminPanel({ seriesData, onSaveData, onClose }) {
 
   const panelRef = useRef(null);
   useModalA11y(panelRef, onClose);
+
+  // Suggestions inbox (public feedback widget writes here)
+  const [suggestions, setSuggestions] = useState([]);
+  const [suggestionsLoading, setSuggestionsLoading] = useState(false);
+  const [deletingSuggestionId, setDeletingSuggestionId] = useState(null);
+
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    setSuggestionsLoading(true);
+    fetchSuggestions()
+      .then(setSuggestions)
+      .catch(err => console.warn('No se pudieron cargar las sugerencias:', err.message))
+      .finally(() => setSuggestionsLoading(false));
+  }, [isAuthenticated]);
+
+  const handleDeleteSuggestion = async (id) => {
+    const previous = suggestions;
+    setDeletingSuggestionId(id);
+    setSuggestions(prev => prev.filter(s => s.id !== id)); // optimistic
+    try {
+      await deleteSuggestion(id);
+    } catch (err) {
+      setSuggestions(previous); // roll back
+      alert(`No se pudo eliminar la sugerencia: ${err.message}`);
+    } finally {
+      setDeletingSuggestionId(null);
+    }
+  };
 
   // Character card collapse/expand + drag-to-reorder
   const [expandedCharIds, setExpandedCharIds] = useState(() => new Set());
@@ -881,6 +910,54 @@ export default function AdminPanel({ seriesData, onSaveData, onClose }) {
                 <p className="text-xs font-semibold text-purple-200 bg-purple-950/30 px-3 py-2 rounded-lg border border-purple-800/30">
                   {tmdbStatus}
                 </p>
+              )}
+            </div>
+
+            {/* SUGGESTIONS INBOX (fed by the public floating widget) */}
+            <div className="p-5 rounded-2xl bg-sky-300/10 border border-sky-300/30 space-y-3">
+              <h3 className="text-base font-bold text-sky-200 font-baloo flex items-center gap-2">
+                <MessageCircle className="w-5 h-5 text-sky-300" />
+                Buzón de Sugerencias
+                {suggestions.length > 0 && (
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-sky-300/20 text-sky-200">
+                    {suggestions.length}
+                  </span>
+                )}
+              </h3>
+              <p className="text-xs text-gray-300 -mt-2">
+                Mensajes enviados por visitantes desde el botón flotante de la web pública.
+              </p>
+
+              {suggestionsLoading ? (
+                <p className="text-xs text-gray-400 flex items-center gap-2">
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" /> Cargando sugerencias...
+                </p>
+              ) : suggestions.length === 0 ? (
+                <p className="text-xs text-gray-400">Todavía no ha llegado ninguna sugerencia.</p>
+              ) : (
+                <div className="space-y-2 max-h-80 overflow-y-auto pr-1">
+                  {suggestions.map(s => (
+                    <div key={s.id} className="p-3 rounded-xl bg-black/30 border border-white/10 flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="text-sm text-gray-100 whitespace-pre-wrap break-words">{s.message}</p>
+                        <p className="text-[10px] text-gray-500 mt-1">
+                          {s.name ? `${s.name} · ` : ''}
+                          {new Date(s.created_at).toLocaleString('es-ES', {
+                            day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit',
+                          })}
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => handleDeleteSuggestion(s.id)}
+                        disabled={deletingSuggestionId === s.id}
+                        aria-label="Eliminar sugerencia"
+                        className="p-1.5 rounded-lg bg-rose-400/10 hover:bg-rose-400/25 text-rose-300 hover:text-white disabled:opacity-40 transition-all shrink-0"
+                      >
+                        {deletingSuggestionId === s.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                      </button>
+                    </div>
+                  ))}
+                </div>
               )}
             </div>
 

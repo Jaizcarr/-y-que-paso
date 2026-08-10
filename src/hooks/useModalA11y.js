@@ -6,8 +6,11 @@ const FOCUSABLE_SELECTOR =
 // Standard modal-dialog accessibility: Escape closes it, Tab is trapped
 // inside it, focus moves into it on open and returns to whatever triggered
 // it on close. `containerRef` must point at the dialog's outer DOM node.
-export function useModalA11y(containerRef, onClose) {
+// `active` covers dialogs that toggle open/closed without unmounting
+// (default true — modals that only ever mount while open don't need it).
+export function useModalA11y(containerRef, onClose, active = true) {
   useEffect(() => {
+    if (!active) return;
     const previouslyFocused = document.activeElement;
     const container = containerRef.current;
     container?.querySelector(FOCUSABLE_SELECTOR)?.focus();
@@ -38,5 +41,5 @@ export function useModalA11y(containerRef, onClose) {
       document.removeEventListener('keydown', handleKeyDown);
       if (previouslyFocused instanceof HTMLElement) previouslyFocused.focus();
     };
-  }, [containerRef, onClose]);
+  }, [containerRef, onClose, active]);
 }

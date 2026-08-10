@@ -3,6 +3,7 @@ import Header from './components/Header';
 import HomeView from './components/HomeView';
 import SeriesView from './components/SeriesView';
 import TimelineMapModal from './components/TimelineMapModal';
+import SuggestionBox from './components/SuggestionBox';
 import { LogoMark } from './components/Placeholders';
 import { fetchSeriesDatabase, syncSeriesDatabase } from './services/db';
 
@@ -134,6 +135,9 @@ export default function App() {
           />
         </Suspense>
       )}
+
+      {/* Floating public suggestions widget */}
+      <SuggestionBox />
 
       {/* Footer */}
       <footer className="border-t border-[var(--border-soft)] py-6 bg-[var(--bg-card)] text-center text-xs text-[var(--text-muted)]">
