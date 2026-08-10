@@ -1,32 +1,49 @@
-import React from 'react';
+import React, { useMemo, useDeferredValue } from 'react';
 import { Search, Tv, ArrowRight, Sparkles } from 'lucide-react';
 import { LogoMark, PosterPlaceholder } from './Placeholders';
 
 export default function HomeView({ seriesList, searchQuery, setSearchQuery, onSelectSeries, onSelectCharacter }) {
-  const filteredSeries = seriesList.filter(s => 
-    s.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    s.originalTitle.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  // The input stays bound to searchQuery so typing feels instant; the
+  // (potentially expensive, on a big catalog) filtering below runs off the
+  // deferred value so React can keep the keystroke responsive.
+  const deferredQuery = useDeferredValue(searchQuery);
 
-  const matchedCharacters = [];
-  if (searchQuery.trim().length > 0) {
+  const filteredSeries = useMemo(() => {
+    const q = deferredQuery.toLowerCase();
+    return seriesList.filter(s =>
+      s.title.toLowerCase().includes(q) || s.originalTitle.toLowerCase().includes(q)
+    );
+  }, [seriesList, deferredQuery]);
+
+  const matchedCharacters = useMemo(() => {
+    const q = deferredQuery.trim().toLowerCase();
+    if (!q) return [];
+    const matches = [];
     seriesList.forEach(s => {
       s.characters.forEach(c => {
-        if (c.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-            (c.actor && c.actor.toLowerCase().includes(searchQuery.toLowerCase())) ||
-            (c.zona && c.zona.toLowerCase().includes(searchQuery.toLowerCase())) ||
-            c.house.toLowerCase().includes(searchQuery.toLowerCase())) {
-          matchedCharacters.push({ ...c, seriesId: s.id, seriesTitle: s.title });
+        if (c.name.toLowerCase().includes(q) ||
+            (c.actor && c.actor.toLowerCase().includes(q)) ||
+            (c.zona && c.zona.toLowerCase().includes(q)) ||
+            c.house.toLowerCase().includes(q)) {
+          matches.push({ ...c, seriesId: s.id, seriesTitle: s.title });
         }
       });
     });
-  }
+    return matches;
+  }, [seriesList, deferredQuery]);
 
   return (
     <div className="min-h-[calc(100vh-5rem)] flex flex-col items-center justify-start px-4 py-8 sm:py-12 max-w-6xl mx-auto text-center font-opensans">
-      
+
       {/* Logo & Title */}
-      <div className="mb-8 cursor-pointer" onClick={() => setSearchQuery('')}>
+      <div
+        className="mb-8 cursor-pointer"
+        role="button"
+        tabIndex={0}
+        aria-label="Limpiar búsqueda"
+        onClick={() => setSearchQuery('')}
+        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSearchQuery(''); } }}
+      >
         <LogoMark className="w-20 h-20 sm:w-24 sm:h-24 mx-auto mb-5" />
 
         <h1 className="font-baloo text-4xl sm:text-5xl md:text-6xl font-extrabold tracking-tight text-[var(--text-main)]">
@@ -41,6 +58,7 @@ export default function HomeView({ seriesList, searchQuery, setSearchQuery, onSe
             <Search className="w-5 h-5 ml-3.5 text-[var(--accent)]" />
             <input
               type="text"
+              aria-label="Busca serie, personaje, actor o zona"
               placeholder="Busca serie, personaje, actor o zona (ej: Juego de Tronos, Jon Nieve, Kit Harington)..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
@@ -55,6 +73,11 @@ export default function HomeView({ seriesList, searchQuery, setSearchQuery, onSe
               </button>
             )}
           </div>
+        </div>
+
+        {/* Announces result count for screen reader users as they type */}
+        <div aria-live="polite" className="sr-only">
+          {searchQuery.trim() && `${filteredSeries.length + matchedCharacters.length} resultados encontrados`}
         </div>
 
         {/* Live Search Dropdown */}
@@ -72,7 +95,7 @@ export default function HomeView({ seriesList, searchQuery, setSearchQuery, onSe
                     >
                       <div className="flex items-center gap-3">
                         {s.poster ? (
-                          <img src={s.poster} alt={s.title} className="w-9 h-11 object-cover rounded-md border border-[var(--border-soft)]" />
+                          <img src={s.poster} alt={s.title} loading="lazy" className="w-9 h-11 object-cover rounded-md border border-[var(--border-soft)]" />
                         ) : (
                           <PosterPlaceholder title={s.title} className="w-9 h-11 rounded-md" />
                         )}
@@ -99,7 +122,7 @@ export default function HomeView({ seriesList, searchQuery, setSearchQuery, onSe
                       className="w-full flex items-center justify-between p-2.5 rounded-xl hover:bg-white/5 transition-colors text-left group"
                     >
                       <div className="flex items-center gap-3">
-                        <img src={c.avatar} alt={c.name} className="w-9 h-9 object-cover rounded-full border border-[var(--border-soft)]" />
+                        <img src={c.avatar} alt={c.name} loading="lazy" className="w-9 h-9 object-cover rounded-full border border-[var(--border-soft)]" />
                         <div>
                           <p className="text-sm font-bold text-white group-hover:text-[var(--accent)] font-baloo">{c.name}</p>
                           <p className="text-xs text-gray-400 font-opensans">Actor: {c.actor || 'N/A'} • <span className="text-[var(--text-muted)]">{c.seriesTitle}</span></p>
@@ -141,6 +164,7 @@ export default function HomeView({ seriesList, searchQuery, setSearchQuery, onSe
                   <img
                     src={series.poster}
                     alt={series.title}
+                    loading="lazy"
                     className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
                   />
                 ) : (

@@ -14,6 +14,24 @@ export async function fetchSeriesDatabase() {
   if (charErr) throw charErr;
   if (eventErr) throw eventErr;
 
+  // Group children by parent id once (O(n)) instead of re-scanning the full
+  // events/characters list per parent (O(n·m)) — keeps this fast as the
+  // catalog grows well beyond a handful of series. Rows arrive pre-sorted by
+  // sort_order, and pushing in that order preserves it within each group.
+  const eventsByCharId = new Map();
+  for (const e of eventRows || []) {
+    const list = eventsByCharId.get(e.character_id);
+    if (list) list.push(e);
+    else eventsByCharId.set(e.character_id, [e]);
+  }
+
+  const charsBySeriesId = new Map();
+  for (const c of charRows || []) {
+    const list = charsBySeriesId.get(c.series_id);
+    if (list) list.push(c);
+    else charsBySeriesId.set(c.series_id, [c]);
+  }
+
   return (seriesRows || []).map(s => ({
     id: s.id,
     title: s.title,
@@ -26,35 +44,31 @@ export async function fetchSeriesDatabase() {
     network: s.network,
     tagline: s.tagline,
     description: s.description,
-    characters: (charRows || [])
-      .filter(c => c.series_id === s.id)
-      .map(c => ({
-        id: c.id,
-        name: c.name,
-        aliases: c.aliases || [],
-        zona: c.zona,
-        edad: c.edad,
-        actor: c.actor,
-        house: c.house,
-        role: c.role,
-        status: c.status,
-        avatar: c.avatar,
-        quote: c.quote,
-        summary: c.summary,
-        events: (eventRows || [])
-          .filter(e => e.character_id === c.id)
-          .map(e => ({
-            id: e.id,
-            season: e.season,
-            episode: e.episode,
-            title: e.title,
-            image: e.image,
-            summary: e.summary,
-            details: e.details,
-            impact: e.impact,
-            isFinalFate: e.is_final_fate,
-          })),
+    characters: (charsBySeriesId.get(s.id) || []).map(c => ({
+      id: c.id,
+      name: c.name,
+      aliases: c.aliases || [],
+      zona: c.zona,
+      edad: c.edad,
+      actor: c.actor,
+      house: c.house,
+      role: c.role,
+      status: c.status,
+      avatar: c.avatar,
+      quote: c.quote,
+      summary: c.summary,
+      events: (eventsByCharId.get(c.id) || []).map(e => ({
+        id: e.id,
+        season: e.season,
+        episode: e.episode,
+        title: e.title,
+        image: e.image,
+        summary: e.summary,
+        details: e.details,
+        impact: e.impact,
+        isFinalFate: e.is_final_fate,
       })),
+    })),
   }));
 }
 

@@ -1,20 +1,27 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo, useDeferredValue } from 'react';
 import { Search, ChevronLeft, Sparkles, MapPin, User, Calendar, Play, Info } from 'lucide-react';
 import { PosterPlaceholder } from './Placeholders';
 
 export default function SeriesView({ series, onBackHome, onSelectCharacter }) {
   const [characterFilter, setCharacterFilter] = useState('');
   const [selectedHouse, setSelectedHouse] = useState('ALL');
+  const deferredFilter = useDeferredValue(characterFilter);
 
-  const houses = ['ALL', ...new Set(series.characters.map(c => c.house))];
+  const houses = useMemo(
+    () => ['ALL', ...new Set(series.characters.map(c => c.house))],
+    [series.characters]
+  );
 
-  const filteredCharacters = series.characters.filter(c => {
-    const matchesName = c.name.toLowerCase().includes(characterFilter.toLowerCase()) ||
-                        (c.actor && c.actor.toLowerCase().includes(characterFilter.toLowerCase())) ||
-                        c.role.toLowerCase().includes(characterFilter.toLowerCase());
-    const matchesHouse = selectedHouse === 'ALL' || c.house === selectedHouse;
-    return matchesName && matchesHouse;
-  });
+  const filteredCharacters = useMemo(() => {
+    const q = deferredFilter.toLowerCase();
+    return series.characters.filter(c => {
+      const matchesName = c.name.toLowerCase().includes(q) ||
+                          (c.actor && c.actor.toLowerCase().includes(q)) ||
+                          c.role.toLowerCase().includes(q);
+      const matchesHouse = selectedHouse === 'ALL' || c.house === selectedHouse;
+      return matchesName && matchesHouse;
+    });
+  }, [series.characters, deferredFilter, selectedHouse]);
 
   return (
     <div className="min-h-screen pb-16">
@@ -87,6 +94,7 @@ export default function SeriesView({ series, onBackHome, onSelectCharacter }) {
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
               <input
                 type="text"
+                aria-label="Buscar por personaje o actor"
                 placeholder="Buscar por personaje o actor..."
                 value={characterFilter}
                 onChange={(e) => setCharacterFilter(e.target.value)}
@@ -99,6 +107,7 @@ export default function SeriesView({ series, onBackHome, onSelectCharacter }) {
                 <button
                   key={h}
                   onClick={() => setSelectedHouse(h)}
+                  aria-pressed={selectedHouse === h}
                   className={`px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-colors ${
                     selectedHouse === h
                       ? 'bg-[var(--accent)] text-[#1e1d1b]'
@@ -115,10 +124,12 @@ export default function SeriesView({ series, onBackHome, onSelectCharacter }) {
         {/* Character Presentation Cards Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredCharacters.map((character) => (
-            <div
+            <button
               key={character.id}
+              type="button"
               onClick={() => onSelectCharacter(series.id, character.id)}
-              className="group relative rounded-2xl glass-panel glass-panel-hover p-5 flex flex-col cursor-pointer overflow-hidden"
+              aria-label={`Ver mapa de destino de ${character.name}`}
+              className="group relative rounded-2xl glass-panel glass-panel-hover p-5 flex flex-col text-left overflow-hidden focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--bg-app)]"
             >
               {/* Avatar Header */}
               <div className="flex items-start gap-4 mb-4">
@@ -126,6 +137,7 @@ export default function SeriesView({ series, onBackHome, onSelectCharacter }) {
                   <img
                     src={character.avatar}
                     alt={character.name}
+                    loading="lazy"
                     className="w-full h-full object-cover rounded-xl"
                   />
                   <div className="absolute -bottom-1 -right-1 bg-[var(--accent)] text-[#1e1d1b] rounded-full p-1 shadow">
@@ -192,7 +204,7 @@ export default function SeriesView({ series, onBackHome, onSelectCharacter }) {
                   Ver Mapa de Destino <ChevronLeft className="w-4 h-4 rotate-180 group-hover:translate-x-1 transition-transform" />
                 </span>
               </div>
-            </div>
+            </button>
           ))}
         </div>
 

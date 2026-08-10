@@ -75,10 +75,13 @@
   opacity: 0.6;
 }
 
-/* Google Maps Canvas Pan/Grab cursor */
-.canvas-grab {
-  cursor: grab;
-}
-.canvas-grabbing {
-  cursor: grabbing;
+/* Respect the OS-level "reduce motion" setting: near-instant transitions
+   instead of turning them off outright (jarring for scroll-snap/focus). */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

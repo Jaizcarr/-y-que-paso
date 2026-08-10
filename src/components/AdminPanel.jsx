@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { X, Lock, Save, Plus, Trash2, Edit3, RefreshCw, Download, Upload, FileSpreadsheet, Check, AlertCircle, Film, Users, Search, Image, Loader2, KeyRound, Copy, GripVertical, ChevronDown, ChevronUp } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { initialSeriesDatabase } from '../data/seriesData';
@@ -12,7 +12,16 @@ import {
   parseSeasonEpisode,
 } from '../services/tmdb';
 import { findSimilarMatch, findCharacterMatch } from '../utils/similarity';
+import { runWithConcurrency } from '../utils/concurrency';
 import { supabase } from '../services/supabaseClient';
+import { useModalA11y } from '../hooks/useModalA11y';
+
+// How many TMDB requests to run at once — fast enough to matter, well under
+// TMDB's ~40 requests/10s rate limit.
+const TMDB_CONCURRENCY = 5;
+
+const ALLOWED_UPLOAD_EXTENSIONS = ['.xlsx', '.xls', '.csv'];
+const MAX_UPLOAD_SIZE = 8 * 1024 * 1024; // 8MB — generous for a spreadsheet with no embedded images
 
 export default function AdminPanel({ seriesData, onSaveData, onClose }) {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -35,6 +44,9 @@ export default function AdminPanel({ seriesData, onSaveData, onClose }) {
       setCheckingSession(false);
     });
   }, []);
+
+  const panelRef = useRef(null);
+  useModalA11y(panelRef, onClose);
 
   // Character card collapse/expand + drag-to-reorder
   const [expandedCharIds, setExpandedCharIds] = useState(() => new Set());
@@ -264,28 +276,35 @@ export default function AdminPanel({ seriesData, onSaveData, onClose }) {
       if (result.poster) handleUpdateSeries('poster', result.poster, selectedSeries.id);
       if (result.backdrop) handleUpdateSeries('backdrop', result.backdrop, selectedSeries.id);
 
-      for (const char of selectedSeries.characters) {
-        if (char.actor) {
-          setTmdbStatus(`Buscando foto de ${char.actor}...`);
-          try {
-            const photo = await searchPersonPhoto(char.actor, tmdbKey);
-            handleUpdateCharacter(char.id, 'avatar', photo);
-          } catch (e) {
-            console.warn(e.message);
-          }
+      const avatarTasks = selectedSeries.characters.filter(c => c.actor);
+      let avatarsDone = 0;
+      await runWithConcurrency(avatarTasks, TMDB_CONCURRENCY, async (char) => {
+        try {
+          const photo = await searchPersonPhoto(char.actor, tmdbKey);
+          handleUpdateCharacter(char.id, 'avatar', photo);
+        } catch (e) {
+          console.warn(e.message);
+        } finally {
+          avatarsDone++;
+          setTmdbStatus(`Buscando fotos de actores... (${avatarsDone}/${avatarTasks.length})`);
         }
+      });
 
-        for (const evt of char.events) {
-          setTmdbStatus(`Buscando imagen de ${char.name} - ${evt.episode}...`);
-          try {
-            const { season, episode } = parseSeasonEpisode(evt);
-            const still = await getEpisodeStill(result.tmdbId, season, episode, tmdbKey);
-            handleUpdateEvent(char.id, evt.id, 'image', still);
-          } catch (e) {
-            console.warn(e.message);
-          }
+      const eventTasks = selectedSeries.characters.flatMap(char => char.events.map(evt => ({ char, evt })));
+      let eventsDone = 0;
+      await runWithConcurrency(eventTasks, TMDB_CONCURRENCY, async ({ char, evt }) => {
+        try {
+          const { season, episode } = parseSeasonEpisode(evt);
+          const still = await getEpisodeStill(result.tmdbId, season, episode, tmdbKey);
+          handleUpdateEvent(char.id, evt.id, 'image', still);
+        } catch (e) {
+          console.warn(e.message);
+        } finally {
+          eventsDone++;
+          setTmdbStatus(`Buscando capturas de episodios... (${eventsDone}/${eventTasks.length})`);
         }
-      }
+      });
+
       setTmdbStatus(`¡Listo! Imágenes de "${result.name}" autocompletadas desde TMDB.`);
     } catch (err) {
       setTmdbStatus(err.message);
@@ -298,6 +317,18 @@ export default function AdminPanel({ seriesData, onSaveData, onClose }) {
   const handleFileUpload = (e) => {
     const file = e.target.files[0];
     if (!file) return;
+
+    const extension = file.name.slice(file.name.lastIndexOf('.')).toLowerCase();
+    if (!ALLOWED_UPLOAD_EXTENSIONS.includes(extension)) {
+      setUploadStatus(`Formato no soportado (${extension || 'sin extensión'}). Usa .xlsx, .xls o .csv.`);
+      e.target.value = '';
+      return;
+    }
+    if (file.size > MAX_UPLOAD_SIZE) {
+      setUploadStatus(`El archivo pesa ${(file.size / 1024 / 1024).toFixed(1)}MB, supera el límite de ${MAX_UPLOAD_SIZE / 1024 / 1024}MB.`);
+      e.target.value = '';
+      return;
+    }
 
     setUploadStatus('Procesando archivo...');
     const reader = new FileReader();
@@ -496,9 +527,10 @@ export default function AdminPanel({ seriesData, onSaveData, onClose }) {
           setUploadStatus(`Datos importados. Buscando ${pendingImages} imágenes automáticamente en TMDB...`);
           const tmdbIdBySeriesId = {};
 
-          for (const series of Object.values(newSeriesMap)) {
-            const needsId = needsPosterIds.has(series.id) || needsEventImageList.some(x => x.seriesId === series.id);
-            if (!needsId) continue;
+          const seriesNeedingLookup = Object.values(newSeriesMap).filter(series =>
+            needsPosterIds.has(series.id) || needsEventImageList.some(x => x.seriesId === series.id)
+          );
+          await runWithConcurrency(seriesNeedingLookup, TMDB_CONCURRENCY, async (series) => {
             try {
               const result = await searchTvShow(series.originalTitle || series.title, currentTmdbKey);
               tmdbIdBySeriesId[series.id] = result.tmdbId;
@@ -509,26 +541,26 @@ export default function AdminPanel({ seriesData, onSaveData, onClose }) {
             } catch (err) {
               console.warn(err.message);
             }
-          }
+          });
 
-          for (const { charObj, actorName } of needsAvatarList) {
+          await runWithConcurrency(needsAvatarList, TMDB_CONCURRENCY, async ({ charObj, actorName }) => {
             try {
               charObj.avatar = await searchPersonPhoto(actorName, currentTmdbKey);
             } catch (err) {
               console.warn(err.message);
             }
-          }
+          });
 
-          for (const { seriesId, eventObj } of needsEventImageList) {
+          await runWithConcurrency(needsEventImageList, TMDB_CONCURRENCY, async ({ seriesId, eventObj }) => {
             const tmdbId = tmdbIdBySeriesId[seriesId];
-            if (!tmdbId) continue;
+            if (!tmdbId) return;
             try {
               const { season, episode } = parseSeasonEpisode(eventObj);
               eventObj.image = await getEpisodeStill(tmdbId, season, episode, currentTmdbKey);
             } catch (err) {
               console.warn(err.message);
             }
-          }
+          });
         }
 
         const updatedArray = Object.values(newSeriesMap);
@@ -622,13 +654,19 @@ export default function AdminPanel({ seriesData, onSaveData, onClose }) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/85 backdrop-blur-md overflow-y-auto font-opensans">
-      <div className="relative w-full max-w-5xl glass-panel rounded-3xl border border-white/15 shadow-2xl overflow-hidden flex flex-col max-h-[92vh]">
-        
+      <div
+        ref={panelRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="admin-modal-title"
+        className="relative w-full max-w-5xl glass-panel rounded-3xl border border-white/15 shadow-2xl overflow-hidden flex flex-col max-h-[92vh]"
+      >
+
         {/* Header */}
         <div className="p-4 border-b border-[var(--border-soft)] flex items-center justify-between bg-black/20">
           <div className="flex items-center gap-2.5">
             <FileSpreadsheet className="w-5 h-5 text-[var(--accent)]" />
-            <h2 className="font-baloo text-xl font-bold text-white">
+            <h2 id="admin-modal-title" className="font-baloo text-xl font-bold text-white">
               Plataforma Admin & Carga Masiva (Excel / CSV)
             </h2>
           </div>
@@ -644,6 +682,7 @@ export default function AdminPanel({ seriesData, onSaveData, onClose }) {
             )}
             <button
               onClick={onClose}
+              aria-label="Cerrar panel de administración"
               className="p-2 rounded-full bg-white/5 hover:bg-[var(--accent-soft)] text-gray-300 hover:text-white transition-colors"
             >
               <X className="w-5 h-5" />
@@ -794,6 +833,7 @@ export default function AdminPanel({ seriesData, onSaveData, onClose }) {
                     autoComplete="off"
                     autoCorrect="off"
                     spellCheck="false"
+                    aria-label="API Key de TMDB"
                     placeholder="Pega aquí tu API Key (v3) de TMDB"
                     value={tmdbKeyInput}
                     onChange={(e) => setTmdbKeyInput(e.target.value)}
@@ -847,8 +887,9 @@ export default function AdminPanel({ seriesData, onSaveData, onClose }) {
             {/* Global Controls */}
             <div className="flex flex-wrap items-center justify-between gap-4 p-4 rounded-2xl bg-black/40 border border-white/10">
               <div className="flex items-center gap-3">
-                <label className="text-xs text-gray-300 font-bold">Seleccionar Serie para Editar:</label>
+                <label htmlFor="admin-series-select" className="text-xs text-gray-300 font-bold">Seleccionar Serie para Editar:</label>
                 <select
+                  id="admin-series-select"
                   value={selectedSeriesId}
                   onChange={(e) => setSelectedSeriesId(e.target.value)}
                   className="bg-black text-xs text-amber-200 px-3 py-2 rounded-xl border border-white/20 font-bold"
@@ -945,7 +986,7 @@ export default function AdminPanel({ seriesData, onSaveData, onClose }) {
                             >
                               <GripVertical className="w-4 h-4" />
                             </span>
-                            <img src={char.avatar} alt={char.name} className="w-9 h-9 rounded-full object-cover border border-rose-300 shrink-0" />
+                            <img src={char.avatar} alt={char.name} loading="lazy" className="w-9 h-9 rounded-full object-cover border border-rose-300 shrink-0" />
                             <div className="min-w-0">
                               <span className="text-sm font-bold text-white block truncate">{char.name}</span>
                               <span className="text-[11px] text-gray-400 block truncate">Zona: {char.zona} • Edad Real: {char.edad} • Actor: {char.actor}</span>
@@ -1049,7 +1090,7 @@ export default function AdminPanel({ seriesData, onSaveData, onClose }) {
                               <div className="space-y-1.5">
                                 {char.events.map((evt, idx) => (
                                   <div key={evt.id || idx} className="p-2.5 rounded-xl bg-black/40 border border-white/10 flex items-center justify-between text-xs gap-2">
-                                    <img src={evt.image} alt="" className="w-8 h-8 rounded-lg object-cover border border-white/10 shrink-0" />
+                                    <img src={evt.image} alt="" loading="lazy" className="w-8 h-8 rounded-lg object-cover border border-white/10 shrink-0" />
                                     <div className="flex-1 truncate">
                                       <span className="font-bold text-white">{evt.episode}: </span>
                                       <span className="text-gray-300">{evt.title}</span>

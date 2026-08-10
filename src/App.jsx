@@ -1,11 +1,25 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense, lazy } from 'react';
 import Header from './components/Header';
 import HomeView from './components/HomeView';
 import SeriesView from './components/SeriesView';
 import TimelineMapModal from './components/TimelineMapModal';
-import AdminPanel from './components/AdminPanel';
 import { LogoMark } from './components/Placeholders';
 import { fetchSeriesDatabase, syncSeriesDatabase } from './services/db';
+
+// Loaded on demand: the Admin panel drags in the xlsx parsing library and is
+// only ever opened by an admin, so regular visitors shouldn't pay for it.
+const AdminPanel = lazy(() => import('./components/AdminPanel'));
+
+function AdminPanelFallback() {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70">
+      <div className="flex flex-col items-center gap-3 text-[var(--text-muted)]">
+        <LogoMark className="w-12 h-12 animate-pulse" />
+        <p className="text-sm">Cargando panel de administración...</p>
+      </div>
+    </div>
+  );
+}
 
 export default function App() {
   const [seriesDatabase, setSeriesDatabase] = useState([]);
@@ -112,11 +126,13 @@ export default function App() {
 
       {/* Admin Editing Platform Modal */}
       {isAdminOpen && (
-        <AdminPanel
-          seriesData={seriesDatabase}
-          onSaveData={handleSaveAdminData}
-          onClose={() => setIsAdminOpen(false)}
-        />
+        <Suspense fallback={<AdminPanelFallback />}>
+          <AdminPanel
+            seriesData={seriesDatabase}
+            onSaveData={handleSaveAdminData}
+            onClose={() => setIsAdminOpen(false)}
+          />
+        </Suspense>
       )}
 
       {/* Footer */}

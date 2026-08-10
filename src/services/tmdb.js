@@ -24,37 +24,57 @@ function assertKey(key) {
   }
 }
 
+// Caches results by request URL so re-searching the same title/actor/episode
+// within a session (e.g. two characters sharing an actor, or re-running a
+// mass upload) reuses the first answer instead of hitting the network again.
+// Failed lookups aren't cached, so a transient error can be retried.
+const requestCache = new Map();
+
+function cached(url, loader) {
+  if (requestCache.has(url)) return requestCache.get(url);
+  const promise = loader().catch(err => {
+    requestCache.delete(url);
+    throw err;
+  });
+  requestCache.set(url, promise);
+  return promise;
+}
+
 export async function searchTvShow(title, key) {
   assertKey(key);
   const url = `${TMDB_BASE}/search/tv?api_key=${encodeURIComponent(key)}&query=${encodeURIComponent(title)}&language=es-ES`;
-  const res = await fetch(url);
-  if (!res.ok) {
-    if (res.status === 401) throw new Error('API Key de TMDB inválida.');
-    throw new Error(`Error TMDB (${res.status}) buscando la serie "${title}".`);
-  }
-  const data = await res.json();
-  const match = data.results?.[0];
-  if (!match) throw new Error(`No se encontró la serie "${title}" en TMDB.`);
-  return {
-    tmdbId: match.id,
-    name: match.name,
-    poster: match.poster_path ? `${IMG_BASE}/w500${match.poster_path}` : null,
-    backdrop: match.backdrop_path ? `${IMG_BASE}/w1280${match.backdrop_path}` : null,
-  };
+  return cached(url, async () => {
+    const res = await fetch(url);
+    if (!res.ok) {
+      if (res.status === 401) throw new Error('API Key de TMDB inválida.');
+      throw new Error(`Error TMDB (${res.status}) buscando la serie "${title}".`);
+    }
+    const data = await res.json();
+    const match = data.results?.[0];
+    if (!match) throw new Error(`No se encontró la serie "${title}" en TMDB.`);
+    return {
+      tmdbId: match.id,
+      name: match.name,
+      poster: match.poster_path ? `${IMG_BASE}/w500${match.poster_path}` : null,
+      backdrop: match.backdrop_path ? `${IMG_BASE}/w1280${match.backdrop_path}` : null,
+    };
+  });
 }
 
 export async function searchPersonPhoto(actorName, key) {
   assertKey(key);
   const url = `${TMDB_BASE}/search/person?api_key=${encodeURIComponent(key)}&query=${encodeURIComponent(actorName)}`;
-  const res = await fetch(url);
-  if (!res.ok) {
-    if (res.status === 401) throw new Error('API Key de TMDB inválida.');
-    throw new Error(`Error TMDB (${res.status}) buscando al actor "${actorName}".`);
-  }
-  const data = await res.json();
-  const match = data.results?.[0];
-  if (!match || !match.profile_path) throw new Error(`No se encontró foto de "${actorName}" en TMDB.`);
-  return `${IMG_BASE}/w400${match.profile_path}`;
+  return cached(url, async () => {
+    const res = await fetch(url);
+    if (!res.ok) {
+      if (res.status === 401) throw new Error('API Key de TMDB inválida.');
+      throw new Error(`Error TMDB (${res.status}) buscando al actor "${actorName}".`);
+    }
+    const data = await res.json();
+    const match = data.results?.[0];
+    if (!match || !match.profile_path) throw new Error(`No se encontró foto de "${actorName}" en TMDB.`);
+    return `${IMG_BASE}/w400${match.profile_path}`;
+  });
 }
 
 // Parses TMDB season/episode numbers from an event's `season` field and its
@@ -69,13 +89,15 @@ export function parseSeasonEpisode(event) {
 export async function getEpisodeStill(tmdbId, season, episode, key) {
   assertKey(key);
   const url = `${TMDB_BASE}/tv/${tmdbId}/season/${season}/episode/${episode}/images?api_key=${encodeURIComponent(key)}`;
-  const res = await fetch(url);
-  if (!res.ok) {
-    if (res.status === 401) throw new Error('API Key de TMDB inválida.');
-    throw new Error(`Error TMDB (${res.status}) buscando imagen de T${season}E${episode}.`);
-  }
-  const data = await res.json();
-  const still = data.stills?.[0];
-  if (!still) throw new Error(`No hay imagen disponible para T${season}E${episode} en TMDB.`);
-  return `${IMG_BASE}/w780${still.file_path}`;
+  return cached(url, async () => {
+    const res = await fetch(url);
+    if (!res.ok) {
+      if (res.status === 401) throw new Error('API Key de TMDB inválida.');
+      throw new Error(`Error TMDB (${res.status}) buscando imagen de T${season}E${episode}.`);
+    }
+    const data = await res.json();
+    const still = data.stills?.[0];
+    if (!still) throw new Error(`No hay imagen disponible para T${season}E${episode} en TMDB.`);
+    return `${IMG_BASE}/w780${still.file_path}`;
+  });
 }
