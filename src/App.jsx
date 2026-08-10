@@ -5,15 +5,24 @@ import SeriesView from './components/SeriesView';
 import TimelineMapModal from './components/TimelineMapModal';
 import AdminPanel from './components/AdminPanel';
 import { LogoMark } from './components/Placeholders';
-import { getStoredSeriesDatabase, saveStoredSeriesDatabase } from './data/seriesData';
+import { fetchSeriesDatabase, syncSeriesDatabase } from './services/db';
 
 export default function App() {
-  const [seriesDatabase, setSeriesDatabase] = useState(getStoredSeriesDatabase);
+  const [seriesDatabase, setSeriesDatabase] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
   const [currentView, setCurrentView] = useState('home'); // 'home' | 'series'
   const [selectedSeriesId, setSelectedSeriesId] = useState('juego-de-tronos');
   const [selectedCharacterId, setSelectedCharacterId] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [isAdminOpen, setIsAdminOpen] = useState(false);
+
+  useEffect(() => {
+    fetchSeriesDatabase()
+      .then(data => setSeriesDatabase(data))
+      .catch(err => setLoadError(err.message || 'Error al cargar la base de datos.'))
+      .finally(() => setIsLoading(false));
+  }, []);
 
   const currentSeries = seriesDatabase.find(s => s.id === selectedSeriesId) || seriesDatabase[0];
   const selectedCharacter = currentSeries?.characters.find(c => c.id === selectedCharacterId);
@@ -37,9 +46,9 @@ export default function App() {
     setSelectedCharacterId(characterId);
   };
 
-  const handleSaveAdminData = (newData) => {
-    setSeriesDatabase(newData);
-    saveStoredSeriesDatabase(newData);
+  const handleSaveAdminData = async (newData) => {
+    setSeriesDatabase(newData); // optimistic UI update
+    await syncSeriesDatabase(newData); // persist to the shared database
   };
 
   const buildTimestamp = new Date(__BUILD_TIME__).toLocaleString('es-ES', {
@@ -65,7 +74,17 @@ export default function App() {
 
       {/* Main Content */}
       <main className="flex-1">
-        {currentView === 'home' ? (
+        {isLoading ? (
+          <div className="min-h-[60vh] flex flex-col items-center justify-center gap-4 text-[var(--text-muted)]">
+            <LogoMark className="w-16 h-16 animate-pulse" />
+            <p className="text-sm">Cargando la wiki...</p>
+          </div>
+        ) : loadError ? (
+          <div className="min-h-[60vh] flex flex-col items-center justify-center gap-3 text-center px-4">
+            <p className="text-sm text-red-300 font-semibold">No se pudo cargar la base de datos</p>
+            <p className="text-xs text-[var(--text-muted)] max-w-md">{loadError}</p>
+          </div>
+        ) : currentView === 'home' ? (
           <HomeView
             seriesList={seriesDatabase}
             searchQuery={searchQuery}

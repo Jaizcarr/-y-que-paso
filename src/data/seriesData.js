@@ -350,19 +350,3 @@ export const initialSeriesDatabase = [
   }
 ];
 
-// Helper to get series database with localStorage persistence
-export function getStoredSeriesDatabase() {
-  const local = localStorage.getItem('y_que_paso_series_db');
-  if (local) {
-    try {
-      return JSON.parse(local);
-    } catch (e) {
-      console.error("Error reading localStorage", e);
-    }
-  }
-  return initialSeriesDatabase;
-}
-
-export function saveStoredSeriesDatabase(data) {
-  localStorage.setItem('y_que_paso_series_db', JSON.stringify(data));
-}

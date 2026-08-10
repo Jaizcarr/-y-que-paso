@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X, Lock, Save, Plus, Trash2, Edit3, RefreshCw, Download, Upload, FileSpreadsheet, Check, AlertCircle, Film, Users, Search, Image, Loader2, KeyRound, Copy, GripVertical, ChevronDown, ChevronUp } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { initialSeriesDatabase } from '../data/seriesData';
@@ -12,17 +12,29 @@ import {
   parseSeasonEpisode,
 } from '../services/tmdb';
 import { findSimilarMatch, findCharacterMatch } from '../utils/similarity';
+import { supabase } from '../services/supabaseClient';
 
 export default function AdminPanel({ seriesData, onSaveData, onClose }) {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [username, setUsername] = useState('');
+  const [checkingSession, setCheckingSession] = useState(true);
+  const [username, setUsername] = useState(''); // Supabase Auth email
   const [password, setPassword] = useState('');
   const [loginError, setLoginError] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
 
   const [editableData, setEditableData] = useState(seriesData);
   const [selectedSeriesId, setSelectedSeriesId] = useState(seriesData[0]?.id || '');
   const [uploadStatus, setUploadStatus] = useState('');
   const [forceRefreshImages, setForceRefreshImages] = useState(false);
+
+  // Restore an existing Supabase session (persisted across reloads) so admins
+  // don't have to log in again every time they open the panel.
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => {
+      setIsAuthenticated(!!data.session);
+      setCheckingSession(false);
+    });
+  }, []);
 
   // Character card collapse/expand + drag-to-reorder
   const [expandedCharIds, setExpandedCharIds] = useState(() => new Set());
@@ -36,14 +48,20 @@ export default function AdminPanel({ seriesData, onSaveData, onClose }) {
   const [searchingKey, setSearchingKey] = useState(null); // e.g. 'bulk' | 'series' | `avatar-${id}` | `event-${id}`
   const [seriesTmdbIds, setSeriesTmdbIds] = useState({}); // seriesId -> tmdb tv id (cache)
 
-  const handleLogin = (e) => {
+  const handleLogin = async (e) => {
     e.preventDefault();
-    if (username === 'admin' && password === 'admin') {
-      setIsAuthenticated(true);
-      setLoginError('');
-    } else {
-      setLoginError('Credenciales incorrectas. Pruebe admin / admin');
+    setLoginError('');
+    const { error } = await supabase.auth.signInWithPassword({ email: username, password });
+    if (error) {
+      setLoginError('Credenciales incorrectas o usuario no creado en Supabase.');
+      return;
     }
+    setIsAuthenticated(true);
+  };
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    setIsAuthenticated(false);
   };
 
   const selectedSeries = editableData.find(s => s.id === selectedSeriesId);
@@ -515,9 +533,10 @@ export default function AdminPanel({ seriesData, onSaveData, onClose }) {
 
         const updatedArray = Object.values(newSeriesMap);
         setEditableData(updatedArray);
-        onSaveData(updatedArray);
+        setUploadStatus('Guardando en la base de datos...');
+        await onSaveData(updatedArray);
 
-        const parts = [`¡Éxito! Se importaron ${data.length} filas del Excel/CSV.`];
+        const parts = [`¡Éxito! Se importaron ${data.length} filas del Excel/CSV y se guardaron en la base de datos.`];
         if (currentTmdbKey && pendingImages > 0) {
           parts.push(`Se autocompletaron ${pendingImages} imágenes vía TMDB.`);
         }
@@ -576,15 +595,28 @@ export default function AdminPanel({ seriesData, onSaveData, onClose }) {
     XLSX.writeFile(workbook, 'Plantilla_Y_QUE_PASO_MassUpload.xlsx');
   };
 
-  const handleSaveAll = () => {
-    onSaveData(editableData);
-    alert('¡Cambios guardados correctamente!');
+  const handleSaveAll = async () => {
+    setIsSaving(true);
+    try {
+      await onSaveData(editableData);
+      alert('¡Cambios guardados en la base de datos!');
+    } catch (err) {
+      alert(`Error al guardar en la base de datos: ${err.message}`);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
-  const handleResetDefaults = () => {
-    if (confirm('¿Restablecer datos originales?')) {
-      setEditableData(initialSeriesDatabase);
-      onSaveData(initialSeriesDatabase);
+  const handleResetDefaults = async () => {
+    if (!confirm('¿Restablecer datos originales? Esto sobrescribe la base de datos compartida para todo el mundo.')) return;
+    setEditableData(initialSeriesDatabase);
+    setIsSaving(true);
+    try {
+      await onSaveData(initialSeriesDatabase);
+    } catch (err) {
+      alert(`Error al restablecer: ${err.message}`);
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -601,16 +633,30 @@ export default function AdminPanel({ seriesData, onSaveData, onClose }) {
             </h2>
           </div>
 
-          <button
-            onClick={onClose}
-            className="p-2 rounded-full bg-white/5 hover:bg-[var(--accent-soft)] text-gray-300 hover:text-white transition-colors"
-          >
-            <X className="w-5 h-5" />
-          </button>
+          <div className="flex items-center gap-2">
+            {isAuthenticated && (
+              <button
+                onClick={handleLogout}
+                className="px-3 py-1.5 rounded-full bg-white/5 hover:bg-white/10 text-xs text-gray-300 hover:text-white transition-colors"
+              >
+                Cerrar sesión
+              </button>
+            )}
+            <button
+              onClick={onClose}
+              className="p-2 rounded-full bg-white/5 hover:bg-[var(--accent-soft)] text-gray-300 hover:text-white transition-colors"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
         </div>
 
         {/* LOGIN FORM IF NOT AUTHENTICATED */}
-        {!isAuthenticated ? (
+        {checkingSession ? (
+          <div className="flex-1 flex items-center justify-center p-12">
+            <Loader2 className="w-6 h-6 text-[var(--accent)] animate-spin" />
+          </div>
+        ) : !isAuthenticated ? (
           <div className="p-8 sm:p-12 text-center max-w-md mx-auto my-auto w-full">
             <div className="w-16 h-16 rounded-full bg-[var(--accent-soft)] flex items-center justify-center mx-auto mb-4">
               <Lock className="w-8 h-8 text-[var(--accent)]" />
@@ -620,15 +666,16 @@ export default function AdminPanel({ seriesData, onSaveData, onClose }) {
               Acceso Administrador
             </h3>
             <p className="text-xs text-gray-300 mb-6">
-              Ingrese credenciales para acceder a la carga gigante de Excel/CSV y edición manual.
+              Inicia sesión con tu cuenta de administrador para editar la base de datos compartida.
             </p>
 
             <form onSubmit={handleLogin} className="space-y-4 text-left">
               <div>
-                <label className="text-xs text-gray-300 font-semibold block mb-1">Usuario</label>
+                <label className="text-xs text-gray-300 font-semibold block mb-1">Email</label>
                 <input
-                  type="text"
-                  placeholder="Usuario"
+                  type="email"
+                  placeholder="tu@email.com"
+                  autoComplete="username"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
                   className="w-full bg-black/30 text-sm text-gray-100 px-4 py-2.5 rounded-xl border border-[var(--border-soft)] focus:outline-none focus:border-[var(--accent)]"
@@ -640,6 +687,7 @@ export default function AdminPanel({ seriesData, onSaveData, onClose }) {
                 <input
                   type="password"
                   placeholder="Contraseña"
+                  autoComplete="current-password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   className="w-full bg-black/30 text-sm text-gray-100 px-4 py-2.5 rounded-xl border border-[var(--border-soft)] focus:outline-none focus:border-[var(--accent)]"
@@ -814,16 +862,19 @@ export default function AdminPanel({ seriesData, onSaveData, onClose }) {
               <div className="flex items-center gap-3">
                 <button
                   onClick={handleResetDefaults}
-                  className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white/5 hover:bg-white/15 text-xs text-gray-300 border border-white/10"
+                  disabled={isSaving}
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white/5 hover:bg-white/15 disabled:opacity-40 text-xs text-gray-300 border border-white/10"
                 >
                   <RefreshCw className="w-3.5 h-3.5" /> Restaurar Originales
                 </button>
 
                 <button
                   onClick={handleSaveAll}
-                  className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-lg"
+                  disabled={isSaving}
+                  className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white text-xs font-bold shadow-lg"
                 >
-                  <Save className="w-4 h-4" /> Guardar Todo
+                  {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                  {isSaving ? 'Guardando...' : 'Guardar Todo'}
                 </button>
               </div>
             </div>

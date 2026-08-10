@@ -44,6 +44,20 @@ export function similarity(a, b) {
   return 1 - distance / maxLen;
 }
 
+function firstToken(str) {
+  return normalizeText(str).split(' ')[0] || '';
+}
+
+// Similarity for PEOPLE names, guarded against family-name collisions: a
+// shared surname alone ("Tywin Lannister" vs "Tyrion Lannister") can push
+// plain string similarity above the threshold even though they're different
+// people. This takes the full-name similarity AND the first-word (first
+// name) similarity, and uses whichever is lower — so a different first name
+// can never be masked by a matching surname.
+export function nameSimilarity(a, b) {
+  return Math.min(similarity(a, b), similarity(firstToken(a), firstToken(b)));
+}
+
 // Finds the closest candidate to `query` by comparing candidate[key].
 // Skips very short names (min 4 normalized chars) to avoid false positives
 // like "Ana" vs "Ada" being merged. Returns { match, score } or null.
@@ -53,7 +67,7 @@ export function findSimilarMatch(query, candidates, { threshold = 0.85, key = 'n
   let best = null;
   let bestScore = 0;
   for (const candidate of candidates) {
-    const score = similarity(query, candidate[key]);
+    const score = nameSimilarity(query, candidate[key]);
     if (score > bestScore) {
       bestScore = score;
       best = candidate;
@@ -75,7 +89,7 @@ export function findCharacterMatch(query, candidates, { threshold = 0.85, minLen
   for (const candidate of candidates) {
     const names = [candidate.name, ...(Array.isArray(candidate.aliases) ? candidate.aliases : [])];
     for (const name of names) {
-      const score = similarity(query, name);
+      const score = nameSimilarity(query, name);
       if (score > bestScore) {
         bestScore = score;
         best = candidate;
