@@ -1,16 +1,18 @@
 import React from 'react';
-import { Search, Home, Lock, Sparkles } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { Search, Home, Lock } from 'lucide-react';
 import { LogoMark } from './Placeholders';
 
-export default function Header({ currentView, selectedSeries, onNavigateHome, searchQuery, setSearchQuery, onOpenAdmin }) {
+export default function Header({ currentView, searchQuery, setSearchQuery, onOpenAdmin }) {
   return (
     <header className="sticky top-0 z-40 w-full glass-panel border-b border-[var(--border-soft)]">
       <div className="cinema-curtain-top"></div>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between gap-4">
 
         {/* Top Left Logo & Name */}
-        <button
-          onClick={onNavigateHome}
+        <Link
+          to="/"
+          onClick={() => setSearchQuery('')}
           className="flex items-center gap-3 group text-left transition-colors duration-200 focus:outline-none"
           title="Ir a la página principal"
         >
@@ -20,7 +22,7 @@ export default function Header({ currentView, selectedSeries, onNavigateHome, se
               Y QUÉ PASÓ?
             </span>
           </div>
-        </button>
+        </Link>
 
         {/* Global Search Bar */}
         {currentView !== 'home' && (
@@ -42,13 +44,14 @@ export default function Header({ currentView, selectedSeries, onNavigateHome, se
         {/* Action Controls */}
         <div className="flex items-center gap-2.5 font-opensans">
           {currentView !== 'home' && (
-            <button
-              onClick={onNavigateHome}
+            <Link
+              to="/"
+              onClick={() => setSearchQuery('')}
               className="flex items-center gap-2 px-3.5 py-2 rounded-full bg-white/5 hover:bg-[var(--accent-soft)] border border-[var(--border-soft)] hover:border-[var(--accent)]/40 text-xs font-medium text-gray-200 hover:text-white transition-all"
             >
               <Home className="w-4 h-4 text-[var(--accent)]" />
               <span className="hidden sm:inline">Inicio</span>
-            </button>
+            </Link>
           )}
 
           {/* Admin Button */}

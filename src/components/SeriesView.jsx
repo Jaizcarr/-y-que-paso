@@ -1,8 +1,15 @@
 import React, { useState, useMemo, useDeferredValue } from 'react';
+import { Link } from 'react-router-dom';
 import { Search, ChevronLeft, Sparkles, MapPin, User, Calendar, Play, Info } from 'lucide-react';
 import { PosterPlaceholder } from './Placeholders';
+import { useDocumentMeta } from '../hooks/useDocumentMeta';
 
-export default function SeriesView({ series, onBackHome, onSelectCharacter }) {
+export default function SeriesView({ series }) {
+  useDocumentMeta({
+    title: series.title,
+    description: series.description || `Personajes y destino final de ${series.title}.`,
+  });
+
   const [characterFilter, setCharacterFilter] = useState('');
   const [selectedHouse, setSelectedHouse] = useState('ALL');
   const deferredFilter = useDeferredValue(characterFilter);
@@ -40,13 +47,13 @@ export default function SeriesView({ series, onBackHome, onSelectCharacter }) {
 
         {/* Back Button Overlay */}
         <div className="absolute top-6 left-4 sm:left-8 z-10">
-          <button
-            onClick={onBackHome}
+          <Link
+            to="/"
             className="flex items-center gap-2 px-4 py-2 rounded-full glass-panel hover:border-[var(--accent)]/40 text-xs sm:text-sm text-gray-200 hover:text-white transition-colors shadow-lg"
           >
             <ChevronLeft className="w-4 h-4 text-[var(--accent)]" />
             <span>Volver a Inicio</span>
-          </button>
+          </Link>
         </div>
 
         {/* Hero Details */}
@@ -124,10 +131,9 @@ export default function SeriesView({ series, onBackHome, onSelectCharacter }) {
         {/* Character Presentation Cards Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredCharacters.map((character) => (
-            <button
+            <Link
               key={character.id}
-              type="button"
-              onClick={() => onSelectCharacter(series.id, character.id)}
+              to={`/${series.id}/${character.id}`}
               aria-label={`Ver mapa de destino de ${character.name}`}
               className="group relative rounded-2xl glass-panel glass-panel-hover p-5 flex flex-col text-left overflow-hidden focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--bg-app)]"
             >
@@ -204,7 +210,7 @@ export default function SeriesView({ series, onBackHome, onSelectCharacter }) {
                   Ver Mapa de Destino <ChevronLeft className="w-4 h-4 rotate-180 group-hover:translate-x-1 transition-transform" />
                 </span>
               </div>
-            </button>
+            </Link>
           ))}
         </div>
 

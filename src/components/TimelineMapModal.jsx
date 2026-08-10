@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { X, AlertCircle, PlayCircle, Crown, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useModalA11y } from '../hooks/useModalA11y';
+import { useDocumentMeta } from '../hooks/useDocumentMeta';
 
 export default function TimelineMapModal({ character, seriesTitle, onClose }) {
   const [selectedEventIndex, setSelectedEventIndex] = useState(0);
@@ -11,6 +12,15 @@ export default function TimelineMapModal({ character, seriesTitle, onClose }) {
   const pendingFocusRef = useRef(false);
 
   useModalA11y(panelRef, onClose);
+
+  // The most specific, most search-worthy page in the app — this is what
+  // should show up when someone Googles a character's name.
+  useDocumentMeta({
+    title: character ? `${character.name} — ${seriesTitle}` : undefined,
+    description: character
+      ? (character.summary || `Descubre qué le pasó a ${character.name} en ${seriesTitle}: su historia y destino final.`)
+      : undefined,
+  });
 
   if (!character || !character.events || character.events.length === 0) return null;
 

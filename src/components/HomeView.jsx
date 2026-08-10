@@ -1,8 +1,14 @@
 import React, { useMemo, useDeferredValue } from 'react';
+import { Link } from 'react-router-dom';
 import { Search, Tv, ArrowRight, Sparkles } from 'lucide-react';
 import { LogoMark, PosterPlaceholder } from './Placeholders';
+import { useDocumentMeta } from '../hooks/useDocumentMeta';
 
-export default function HomeView({ seriesList, searchQuery, setSearchQuery, onSelectSeries, onSelectCharacter }) {
+export default function HomeView({ seriesList, searchQuery, setSearchQuery }) {
+  useDocumentMeta({
+    description: 'Descubre el destino histórico de tus personajes favoritos de series como Juego de Tronos, Breaking Bad y Stranger Things.',
+  });
+
   // The input stays bound to searchQuery so typing feels instant; the
   // (potentially expensive, on a big catalog) filtering below runs off the
   // deferred value so React can keep the keystroke responsive.
@@ -88,9 +94,10 @@ export default function HomeView({ seriesList, searchQuery, setSearchQuery, onSe
                 <span className="text-xs font-semibold text-[var(--accent)] uppercase tracking-wider block mb-2 px-2">Series encontradas</span>
                 <div className="space-y-1.5">
                   {filteredSeries.map(s => (
-                    <button
+                    <Link
                       key={s.id}
-                      onClick={() => onSelectSeries(s.id)}
+                      to={`/${s.id}`}
+                      onClick={() => setSearchQuery('')}
                       className="w-full flex items-center justify-between p-2.5 rounded-xl hover:bg-white/5 transition-colors text-left group"
                     >
                       <div className="flex items-center gap-3">
@@ -105,7 +112,7 @@ export default function HomeView({ seriesList, searchQuery, setSearchQuery, onSe
                         </div>
                       </div>
                       <ArrowRight className="w-4 h-4 text-gray-400 group-hover:text-[var(--accent)] transition-transform group-hover:translate-x-1" />
-                    </button>
+                    </Link>
                   ))}
                 </div>
               </div>
@@ -116,9 +123,10 @@ export default function HomeView({ seriesList, searchQuery, setSearchQuery, onSe
                 <span className="text-xs font-semibold text-[var(--accent)] uppercase tracking-wider block mb-2 px-2">Personajes encontrados</span>
                 <div className="space-y-1.5">
                   {matchedCharacters.map(c => (
-                    <button
+                    <Link
                       key={c.id}
-                      onClick={() => onSelectCharacter(c.seriesId, c.id)}
+                      to={`/${c.seriesId}/${c.id}`}
+                      onClick={() => setSearchQuery('')}
                       className="w-full flex items-center justify-between p-2.5 rounded-xl hover:bg-white/5 transition-colors text-left group"
                     >
                       <div className="flex items-center gap-3">
@@ -129,7 +137,7 @@ export default function HomeView({ seriesList, searchQuery, setSearchQuery, onSe
                         </div>
                       </div>
                       <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-[var(--accent-soft)] text-[var(--accent)]">Ver Mapa</span>
-                    </button>
+                    </Link>
                   ))}
                 </div>
               </div>
@@ -154,10 +162,10 @@ export default function HomeView({ seriesList, searchQuery, setSearchQuery, onSe
 
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
           {seriesList.map((series) => (
-            <button
+            <Link
               key={series.id}
-              onClick={() => onSelectSeries(series.id)}
-              className="group relative rounded-2xl glass-panel glass-panel-hover p-4 flex flex-col text-left overflow-hidden focus:outline-none"
+              to={`/${series.id}`}
+              className="group relative rounded-2xl glass-panel glass-panel-hover p-4 flex flex-col text-left overflow-hidden focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--bg-app)]"
             >
               <div className="relative aspect-[3/4] w-full rounded-xl overflow-hidden mb-3 bg-black/20 border border-[var(--border-soft)] transition-colors">
                 {series.poster ? (
@@ -199,7 +207,7 @@ export default function HomeView({ seriesList, searchQuery, setSearchQuery, onSe
                   Explorar Wiki <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
                 </span>
               </div>
-            </button>
+            </Link>
           ))}
         </div>
       </div>

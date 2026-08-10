@@ -1,9 +1,11 @@
 import React, { useState, useEffect, Suspense, lazy } from 'react';
+import { Routes, Route, useParams, useNavigate, useLocation } from 'react-router-dom';
 import Header from './components/Header';
 import HomeView from './components/HomeView';
 import SeriesView from './components/SeriesView';
 import TimelineMapModal from './components/TimelineMapModal';
 import SuggestionBox from './components/SuggestionBox';
+import NotFoundView from './components/NotFoundView';
 import { LogoMark } from './components/Placeholders';
 import { fetchSeriesDatabase, syncSeriesDatabase } from './services/db';
 
@@ -22,15 +24,40 @@ function AdminPanelFallback() {
   );
 }
 
+// Resolves /:seriesId/:characterId against the loaded database. A bad slug
+// (broken link, deleted character) falls back to the 404 view instead of
+// crashing or silently showing the wrong thing.
+function SeriesRoute({ seriesDatabase }) {
+  const { seriesId, characterId } = useParams();
+  const navigate = useNavigate();
+  const series = seriesDatabase.find(s => s.id === seriesId);
+
+  if (!series) return <NotFoundView />;
+
+  const character = characterId ? series.characters.find(c => c.id === characterId) : null;
+  if (characterId && !character) return <NotFoundView />;
+
+  return (
+    <>
+      <SeriesView series={series} />
+      {character && (
+        <TimelineMapModal
+          character={character}
+          seriesTitle={series.title}
+          onClose={() => navigate(`/${series.id}`)}
+        />
+      )}
+    </>
+  );
+}
+
 export default function App() {
   const [seriesDatabase, setSeriesDatabase] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
-  const [currentView, setCurrentView] = useState('home'); // 'home' | 'series'
-  const [selectedSeriesId, setSelectedSeriesId] = useState('juego-de-tronos');
-  const [selectedCharacterId, setSelectedCharacterId] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [isAdminOpen, setIsAdminOpen] = useState(false);
+  const location = useLocation();
 
   useEffect(() => {
     fetchSeriesDatabase()
@@ -38,28 +65,6 @@ export default function App() {
       .catch(err => setLoadError(err.message || 'Error al cargar la base de datos.'))
       .finally(() => setIsLoading(false));
   }, []);
-
-  const currentSeries = seriesDatabase.find(s => s.id === selectedSeriesId) || seriesDatabase[0];
-  const selectedCharacter = currentSeries?.characters.find(c => c.id === selectedCharacterId);
-
-  const handleNavigateHome = () => {
-    setCurrentView('home');
-    setSelectedCharacterId(null);
-    setSearchQuery('');
-  };
-
-  const handleSelectSeries = (seriesId) => {
-    setSelectedSeriesId(seriesId);
-    setCurrentView('series');
-    setSelectedCharacterId(null);
-    setSearchQuery('');
-  };
-
-  const handleSelectCharacter = (seriesId, characterId) => {
-    setSelectedSeriesId(seriesId);
-    setCurrentView('series');
-    setSelectedCharacterId(characterId);
-  };
 
   const handleSaveAdminData = async (newData) => {
     setSeriesDatabase(newData); // optimistic UI update
@@ -79,9 +84,7 @@ export default function App() {
     <div className="min-h-screen bg-[var(--bg-app)] text-gray-100 flex flex-col font-opensans selection:bg-[var(--accent)] selection:text-white">
       {/* Header */}
       <Header
-        currentView={currentView}
-        selectedSeries={currentSeries}
-        onNavigateHome={handleNavigateHome}
+        currentView={location.pathname === '/' ? 'home' : 'series'}
         searchQuery={searchQuery}
         setSearchQuery={setSearchQuery}
         onOpenAdmin={() => setIsAdminOpen(true)}
@@ -99,31 +102,24 @@ export default function App() {
             <p className="text-sm text-red-300 font-semibold">No se pudo cargar la base de datos</p>
             <p className="text-xs text-[var(--text-muted)] max-w-md">{loadError}</p>
           </div>
-        ) : currentView === 'home' ? (
-          <HomeView
-            seriesList={seriesDatabase}
-            searchQuery={searchQuery}
-            setSearchQuery={setSearchQuery}
-            onSelectSeries={handleSelectSeries}
-            onSelectCharacter={handleSelectCharacter}
-          />
         ) : (
-          <SeriesView
-            series={currentSeries}
-            onBackHome={handleNavigateHome}
-            onSelectCharacter={(sId, cId) => setSelectedCharacterId(cId)}
-          />
+          <Routes>
+            <Route
+              path="/"
+              element={
+                <HomeView
+                  seriesList={seriesDatabase}
+                  searchQuery={searchQuery}
+                  setSearchQuery={setSearchQuery}
+                />
+              }
+            />
+            <Route path="/:seriesId" element={<SeriesRoute seriesDatabase={seriesDatabase} />} />
+            <Route path="/:seriesId/:characterId" element={<SeriesRoute seriesDatabase={seriesDatabase} />} />
+            <Route path="*" element={<NotFoundView />} />
+          </Routes>
         )}
       </main>
-
-      {/* Timeline Map Modal */}
-      {selectedCharacter && (
-        <TimelineMapModal
-          character={selectedCharacter}
-          seriesTitle={currentSeries.title}
-          onClose={() => setSelectedCharacterId(null)}
-        />
-      )}
 
       {/* Admin Editing Platform Modal */}
       {isAdminOpen && (
