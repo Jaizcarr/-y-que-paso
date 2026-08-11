@@ -109,7 +109,7 @@ export default function SeriesView({ series }) {
               />
             </div>
 
-            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 max-w-full">
+            <div className="h-scroll flex items-center gap-1.5 overflow-x-auto pb-1 max-w-full">
               {houses.slice(0, 4).map(h => (
                 <button
                   key={h}

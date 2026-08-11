@@ -158,7 +158,7 @@ export default function TimelineMapModal({ character, seriesTitle, onClose }) {
             <div
               ref={trackRef}
               onWheel={handleWheel}
-              className="w-full h-full overflow-x-auto overflow-y-hidden snap-x snap-mandatory scroll-smooth flex items-center"
+              className="h-scroll w-full h-full overflow-x-auto overflow-y-hidden snap-x snap-mandatory scroll-smooth flex items-center"
             >
               <div className="relative flex items-center gap-12 sm:gap-16 pt-14 pb-10 px-16 min-w-max">
                 {/* Connecting Track Line */}
