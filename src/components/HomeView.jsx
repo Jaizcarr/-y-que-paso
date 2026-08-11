@@ -65,7 +65,7 @@ export default function HomeView({ seriesList, searchQuery, setSearchQuery }) {
             <input
               type="text"
               aria-label="Busca serie, personaje, actor o zona"
-              placeholder="Busca serie, personaje, actor o zona (ej: Juego de Tronos, Jon Nieve, Kit Harington)..."
+              placeholder="Busca serie, personaje, actor o zona"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full bg-transparent px-4 py-2.5 text-sm sm:text-base text-gray-100 placeholder-gray-400 focus:outline-none font-opensans"
@@ -193,9 +193,6 @@ export default function HomeView({ seriesList, searchQuery, setSearchQuery }) {
                   <h3 className="font-baloo text-2xl font-bold text-white transition-colors leading-tight">
                     {series.title}
                   </h3>
-                  <p className="text-xs text-gray-300 line-clamp-1 italic mt-0.5 font-opensans">
-                    "{series.tagline}"
-                  </p>
                 </div>
               </div>
 

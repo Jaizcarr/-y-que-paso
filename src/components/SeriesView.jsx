@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useDeferredValue } from 'react';
 import { Link } from 'react-router-dom';
-import { Search, ChevronLeft, Sparkles, MapPin, User, Calendar, Play, Info } from 'lucide-react';
+import { Search, ChevronLeft, Sparkles, MapPin, User, Calendar, Info } from 'lucide-react';
 import { PosterPlaceholder } from './Placeholders';
 import { useDocumentMeta } from '../hooks/useDocumentMeta';
 
@@ -146,9 +146,6 @@ export default function SeriesView({ series }) {
                     loading="lazy"
                     className="w-full h-full object-cover rounded-xl"
                   />
-                  <div className="absolute -bottom-1 -right-1 bg-[var(--accent)] text-[#1e1d1b] rounded-full p-1 shadow">
-                    <Play className="w-3 h-3 fill-current ml-0.5" />
-                  </div>
                 </div>
 
                 <div className="flex-1 min-w-0">
@@ -199,12 +196,9 @@ export default function SeriesView({ series }) {
               )}
 
               {/* Action Strip */}
-              <div className="mt-auto pt-3 border-t border-[var(--border-soft)] flex items-center justify-between">
+              <div className="mt-auto pt-3 border-t border-[var(--border-soft)]">
                 <span className="text-[11px] text-gray-400">
                   {character.events.length} Eventos Canónicos
-                </span>
-                <span className="text-xs font-bold text-[var(--accent)] flex items-center gap-1">
-                  Ver Mapa de Destino <ChevronLeft className="w-4 h-4 rotate-180 group-hover:translate-x-1 transition-transform" />
                 </span>
               </div>
             </Link>
