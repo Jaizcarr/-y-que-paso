@@ -93,23 +93,23 @@ export default function TimelineMapModal({ character, seriesTitle, onClose }) {
       >
 
         {/* Top Header Bar */}
-        <div className="p-4 border-b border-[var(--border-soft)] flex items-center justify-between bg-black/20">
-          <div className="flex items-center gap-3">
+        <div className="p-3 sm:p-4 border-b border-[var(--border-soft)] flex items-center justify-between gap-3 bg-black/20">
+          <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
             <img
               src={character.avatar}
               alt={character.name}
-              className="w-11 h-11 rounded-full object-cover border-2 border-[var(--accent)]/60"
+              className="w-9 h-9 sm:w-11 sm:h-11 shrink-0 rounded-full object-cover border-2 border-[var(--accent)]/60"
             />
-            <div>
-              <div className="flex items-center gap-2">
-                <h2 id="map-modal-title" className="font-baloo text-xl sm:text-2xl font-bold text-white leading-none">
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                <h2 id="map-modal-title" className="font-baloo text-base sm:text-2xl font-bold text-white leading-tight truncate max-w-[60vw] sm:max-w-none">
                   {character.name}
                 </h2>
-                <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-[var(--accent-soft)] text-[var(--accent)]">
+                <span className="shrink-0 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-[var(--accent-soft)] text-[var(--accent)]">
                   {seriesTitle}
                 </span>
               </div>
-              <p className="text-xs text-gray-300 font-opensans mt-1">
+              <p className="text-xs text-gray-300 font-opensans mt-1 truncate">
                 {character.actor && <span>Actor: {character.actor} • </span>}
                 <span className="text-emerald-300 font-semibold">{character.status}</span>
               </p>
@@ -118,7 +118,7 @@ export default function TimelineMapModal({ character, seriesTitle, onClose }) {
 
           <button
             onClick={onClose}
-            className="p-2 rounded-full bg-white/5 hover:bg-[var(--accent-soft)] text-gray-300 hover:text-white transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
+            className="shrink-0 p-2 rounded-full bg-white/5 hover:bg-[var(--accent-soft)] text-gray-300 hover:text-white transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
             title="Cerrar Mapa"
             aria-label="Cerrar"
           >
@@ -235,29 +235,30 @@ export default function TimelineMapModal({ character, seriesTitle, onClose }) {
             </div>
 
             {/* Bottom Quick Jump Bar */}
-            <div className="p-3 bg-black/30 border-t border-[var(--border-soft)] flex items-center justify-between z-20">
+            <div className="p-2.5 sm:p-3 bg-black/30 border-t border-[var(--border-soft)] flex items-center justify-between gap-2 z-20">
               <button
                 onClick={() => goTo(lastIndex)}
-                className="flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-[var(--accent-soft)] hover:brightness-110 text-[var(--accent)] text-xs font-semibold transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
+                className="flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3.5 py-1.5 rounded-full bg-[var(--accent-soft)] hover:brightness-110 text-[var(--accent)] text-xs font-semibold whitespace-nowrap transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
               >
-                <Crown className="w-4 h-4" />
-                <span>Ver Burbuja Final de Destino</span>
+                <Crown className="w-4 h-4 shrink-0" />
+                <span className="hidden sm:inline">Ver Burbuja Final de Destino</span>
+                <span className="sm:hidden">Destino Final</span>
               </button>
 
               {/* Prev / Next buttons */}
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
                 <button
                   onClick={() => goTo(selectedEventIndex - 1)}
                   disabled={selectedEventIndex === 0}
-                  className="px-3 py-1 rounded-full bg-white/5 hover:bg-white/10 text-xs text-gray-300 disabled:opacity-30 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
+                  className="px-2.5 sm:px-3 py-1 rounded-full bg-white/5 hover:bg-white/10 text-xs text-gray-300 disabled:opacity-30 whitespace-nowrap focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
                 >
                   Anterior
                 </button>
-                <span className="text-xs text-gray-400 font-bold" aria-hidden="true">{selectedEventIndex + 1}/{character.events.length}</span>
+                <span className="text-xs text-gray-400 font-bold whitespace-nowrap" aria-hidden="true">{selectedEventIndex + 1}/{character.events.length}</span>
                 <button
                   onClick={() => goTo(selectedEventIndex + 1)}
                   disabled={selectedEventIndex === lastIndex}
-                  className="px-3 py-1 rounded-full bg-[var(--accent-soft)] hover:brightness-110 text-[var(--accent)] text-xs font-semibold disabled:opacity-30 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
+                  className="px-2.5 sm:px-3 py-1 rounded-full bg-[var(--accent-soft)] hover:brightness-110 text-[var(--accent)] text-xs font-semibold disabled:opacity-30 whitespace-nowrap focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
                 >
                   Siguiente
                 </button>

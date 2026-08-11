@@ -16,9 +16,9 @@ export default function Header({ currentView, searchQuery, setSearchQuery, onOpe
           className="flex items-center gap-3 group text-left transition-colors duration-200 focus:outline-none"
           title="Ir a la página principal"
         >
-          <LogoMark className="w-11 h-11 group-hover:brightness-110 transition-all" />
+          <LogoMark className="w-9 h-9 sm:w-11 sm:h-11 shrink-0 group-hover:brightness-110 transition-all" />
           <div>
-            <span className="font-baloo text-2xl font-extrabold tracking-tight text-[var(--text-main)]">
+            <span className="font-baloo text-base sm:text-2xl font-extrabold tracking-tight text-[var(--text-main)] whitespace-nowrap">
               Y QUÉ PASÓ?
             </span>
           </div>
@@ -57,11 +57,12 @@ export default function Header({ currentView, searchQuery, setSearchQuery, onOpe
           {/* Admin Button */}
           <button
             onClick={onOpenAdmin}
-            className="flex items-center gap-1.5 px-4 py-2 rounded-full bg-[var(--accent)] text-[#1e1d1b] text-xs font-bold shadow-md shadow-[var(--accent)]/20 hover:shadow-lg hover:shadow-[var(--accent)]/30 hover:-translate-y-0.5 active:translate-y-0 transition-all duration-200"
+            className="flex items-center gap-1.5 px-3 sm:px-4 py-2 rounded-full bg-[var(--accent)] text-[#1e1d1b] text-xs font-bold whitespace-nowrap shadow-md shadow-[var(--accent)]/20 hover:shadow-lg hover:shadow-[var(--accent)]/30 hover:-translate-y-0.5 active:translate-y-0 transition-all duration-200"
             title="Abrir Panel Admin y Carga Masiva Excel/CSV"
           >
-            <Lock className="w-3.5 h-3.5" />
-            <span>Admin / Excel</span>
+            <Lock className="w-3.5 h-3.5 shrink-0" />
+            <span className="hidden sm:inline">Admin / Excel</span>
+            <span className="sm:hidden">Admin</span>
           </button>
         </div>
 

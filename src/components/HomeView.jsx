@@ -148,14 +148,14 @@ export default function HomeView({ seriesList, searchQuery, setSearchQuery }) {
 
       {/* Series Grid */}
       <div className="w-full">
-        <div className="flex items-center justify-between mb-6 border-b border-[var(--border-soft)] pb-3">
-          <div className="flex items-center gap-2">
-            <Tv className="w-5 h-5 text-[var(--accent)]" />
-            <h2 className="text-2xl font-bold font-baloo text-white tracking-wide">
+        <div className="flex flex-wrap items-center justify-between gap-2 mb-6 border-b border-[var(--border-soft)] pb-3">
+          <div className="flex items-center gap-2 min-w-0">
+            <Tv className="w-5 h-5 text-[var(--accent)] shrink-0" />
+            <h2 className="text-lg sm:text-2xl font-bold font-baloo text-white tracking-wide whitespace-nowrap">
               Catálogo de Series
             </h2>
           </div>
-          <span className="text-xs text-gray-300 bg-white/5 px-3 py-1 rounded-full border border-[var(--border-soft)] font-opensans">
+          <span className="shrink-0 text-xs text-gray-300 bg-white/5 px-3 py-1 rounded-full border border-[var(--border-soft)] font-opensans">
             {seriesList.length} disponibles
           </span>
         </div>

@@ -165,30 +165,27 @@ export default function SeriesView({ series }) {
               </div>
 
               {/* Carta de Presentación Mínima: Zona, Edad, Actor */}
-              <div className="grid grid-cols-3 gap-2 mb-4 p-3 rounded-xl bg-black/20 border border-[var(--border-soft)] text-center">
-                <div className="flex flex-col items-center">
-                  <span className="text-[10px] text-gray-400 flex items-center gap-1 font-semibold uppercase">
-                    <MapPin className="w-3 h-3 text-[var(--accent)]" /> Zona
-                  </span>
-                  <span className="text-xs text-gray-200 font-bold mt-1 line-clamp-1">
+              <div className="mb-4 rounded-xl bg-black/20 border border-[var(--border-soft)] divide-y divide-[var(--border-soft)]">
+                <div className="flex items-center gap-2 px-3 py-2">
+                  <MapPin className="w-3.5 h-3.5 text-[var(--accent)] shrink-0" />
+                  <span className="text-[10px] text-gray-400 font-semibold uppercase tracking-wide shrink-0">Zona</span>
+                  <span className="ml-auto text-xs text-gray-200 font-bold text-right truncate">
                     {character.zona || 'Desconocida'}
                   </span>
                 </div>
 
-                <div className="flex flex-col items-center border-x border-[var(--border-soft)] px-1">
-                  <span className="text-[10px] text-gray-400 flex items-center gap-1 font-semibold uppercase">
-                    <Calendar className="w-3 h-3 text-[var(--accent)]" /> Edad del Actor
-                  </span>
-                  <span className="text-xs text-gray-200 font-bold mt-1 line-clamp-1">
+                <div className="flex items-center gap-2 px-3 py-2">
+                  <Calendar className="w-3.5 h-3.5 text-[var(--accent)] shrink-0" />
+                  <span className="text-[10px] text-gray-400 font-semibold uppercase tracking-wide shrink-0">Edad del actor</span>
+                  <span className="ml-auto text-xs text-gray-200 font-bold text-right truncate">
                     {character.edad || 'N/A'}
                   </span>
                 </div>
 
-                <div className="flex flex-col items-center">
-                  <span className="text-[10px] text-gray-400 flex items-center gap-1 font-semibold uppercase">
-                    <User className="w-3 h-3 text-[var(--accent)]" /> Actor
-                  </span>
-                  <span className="text-xs text-gray-200 font-bold mt-1 line-clamp-1">
+                <div className="flex items-center gap-2 px-3 py-2">
+                  <User className="w-3.5 h-3.5 text-[var(--accent)] shrink-0" />
+                  <span className="text-[10px] text-gray-400 font-semibold uppercase tracking-wide shrink-0">Actor</span>
+                  <span className="ml-auto text-xs text-gray-200 font-bold text-right truncate">
                     {character.actor || 'N/A'}
                   </span>
                 </div>
